@@ -119,7 +119,7 @@ notes:
 	@command -v git-cliff >/dev/null || { echo "git-cliff missing: brew install git-cliff"; exit 1; }
 	@test ! -f "$(NOTES)" || { echo "$(NOTES) exists already — edit it"; exit 1; }
 	@mkdir -p notes
-	@git-cliff --unreleased --tag "$(VERSION)" -o "$(NOTES)"
+	@git-cliff --config .github/cliff.toml --unreleased --tag "$(VERSION)" -o "$(NOTES)"
 	@echo "drafted $(NOTES) — REWRITE it for humans, then commit it"
 
 # Notarization is a credentialed act, so releasing is a LOCAL command: the
@@ -129,6 +129,11 @@ release: check build $(ICON)
 	@test -z "$$(git status --porcelain)" || { echo "working tree is dirty"; exit 1; }
 	@! git rev-parse -q --verify "refs/tags/$(VERSION)" >/dev/null || { echo "tag $(VERSION) exists — bump VERSION"; exit 1; }
 	@test -f "$(NOTES)" || { echo "no $(NOTES) — run 'make notes', then write it"; exit 1; }
+	@# The grammar, checked HERE rather than by whoever renders it later: notes
+	@# publish as DESIGNED releases (a glyph per group), so a body without groups
+	@# and items renders as a dated heading with nothing underneath.
+	@grep -q '^### ' "$(NOTES)" && grep -q '^- ' "$(NOTES)" || \
+		{ echo "$(NOTES) needs '### Added|Fixed|Changed|Performance|Polish' sections with '- ' items"; exit 1; }
 	@test -n "$(SIGN_ID)" || { echo "no 'Developer ID Application' certificate in the keychain"; exit 1; }
 	@xcrun notarytool history --keychain-profile "$(NOTARY_PROFILE)" >/dev/null 2>&1 || \
 		{ echo "no notary keychain profile '$(NOTARY_PROFILE)' — see the Makefile header"; exit 1; }

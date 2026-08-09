@@ -1,0 +1,35 @@
+# The changelog grammar, and the reason it is not free-form markdown: these
+# notes are rendered as DESIGNED releases (a glyph per group), not dumped, so a
+# body without "### Group" sections and "- " items renders as a dated heading
+# with nothing underneath. git-cliff drafts into the grammar (`make notes`) and
+# a human rewrites the items; `make release` refuses anything that lost it.
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}- {{ commit.message | upper_first }}
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+tag_pattern = "[0-9]+\\.[0-9]+\\.[0-9]+"
+
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^style", group = "Polish" },
+  { message = "^docs", skip = true },
+  { message = "^release", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+  { message = "^test", skip = true },
+]
