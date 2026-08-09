@@ -86,6 +86,22 @@ enum Client {
         print("battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
     }
 
+    /// No argument shows, `on`/`off` sets. The standing preference, not the
+    /// one-shot `--display` flag: this one survives and applies to the menu,
+    /// the hotkey and every CLI engagement.
+    static func keepDisplay(_ args: [String]) {
+        let status: Status
+        switch args.first {
+        case nil: status = send(.status).status
+        case "on": status = send(.setKeepDisplay(true)).status
+        case "off": status = send(.setKeepDisplay(false)).status
+        default: die("usage: awake display [on|off]")
+        }
+        print(status.keepDisplay
+            ? "display: kept on for every session"
+            : "display: allowed to sleep (--display for one session)")
+    }
+
     /// No argument shows, a path sets, `--clear` removes. Always through the daemon:
     /// it holds config in memory, so editing config.json by hand loses the edit.
     static func notifyHook(_ args: [String]) {

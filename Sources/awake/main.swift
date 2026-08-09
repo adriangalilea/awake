@@ -12,6 +12,7 @@ awake — keep the Mac awake, lid closed included. One state machine, menu bar +
   asleep | awake off    end the session, restore normal sleep
   awake status [--json] intent + effect + battery, honestly
   awake floor N         battery floor percent (0 disables)
+  awake display [on|off] standing "keep the screen on" preference
   awake notify [CMD]    out-of-band hook for closed-lid ends (--clear removes)
   awake hotkey [COMBO]  show/remap the global toggle (--reset for default)
   awake grant           install the scoped sudoers grant (once)
@@ -47,6 +48,8 @@ case "off":
 case "floor":
     guard args.count == 2, let v = Int(args[1]) else { Client.die("usage: awake floor <percent>") }
     Client.setFloor(v)
+case "display":
+    Client.keepDisplay(Array(args.dropFirst()))
 case "notify":
     Client.notifyHook(Array(args.dropFirst()))
 case "hotkey":

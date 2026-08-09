@@ -25,7 +25,7 @@ APPBIN := $(APP)/Contents/MacOS/awake
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION := 0.1.2
+VERSION := 0.1.3
 
 DIST := dist
 RELEASE_APP := $(DIST)/awake.app

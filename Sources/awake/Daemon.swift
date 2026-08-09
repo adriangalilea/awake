@@ -201,6 +201,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         case .setNotifyCommand(let c):
             machine.setNotifyCommand(c)
             return Reply(ok: true, status: machine.status())
+        case .setKeepDisplay(let on):
+            setKeepDisplay(on)
+            return Reply(ok: true, status: machine.status())
         }
     }
 
@@ -359,9 +362,16 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     @objc private func endClicked() { machine.end(.requested) }
 
     @objc private func displayToggled() {
-        machine.setMenuDisplay(!machine.config.menuDisplay)
+        setKeepDisplay(!machine.config.menuDisplay)
+    }
+
+    /// The preference AND the running session, together: flipping it while a
+    /// session is up has to add or drop the assertion now, not at the next
+    /// engagement. Menu and CLI both land here so they cannot diverge.
+    func setKeepDisplay(_ on: Bool) {
+        machine.setMenuDisplay(on)
         if var s = machine.session {
-            if machine.config.menuDisplay { s.modes.insert(.display) } else { s.modes.remove(.display) }
+            if on { s.modes.insert(.display) } else { s.modes.remove(.display) }
             if let err = machine.engage(s) { Daemon.screenNotify(err.message) }
         }
     }

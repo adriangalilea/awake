@@ -48,6 +48,9 @@ public struct Status: Codable, Equatable, Sendable {
     public var floor: Int
     /// Empty when no out-of-band hook is configured.
     public var notifyCommand: String
+    /// The standing "keep the display on" preference, applied to every
+    /// engagement path. Distinct from a session merely holding `.display`.
+    public var keepDisplay: Bool
 }
 
 /// THE state machine. Intent lives here (and mirrored to disk); effect lives in the
@@ -237,7 +240,8 @@ public final class StateMachine {
                       sleepDisabled: Kernel.sleepDisabled(),
                       power: Battery.snapshot(),
                       floor: config.batteryFloorPercent,
-                      notifyCommand: config.notifyCommand)
+                      notifyCommand: config.notifyCommand,
+                      keepDisplay: config.menuDisplay)
     }
 
     // MARK: - The choke point
