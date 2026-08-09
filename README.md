@@ -59,6 +59,31 @@ Because a flag that outlives its owner is dangerous, a resident daemon guards it
 
 This is why it is a daemon and not a one-shot command: a command that has exited cannot guard anything.
 
+## Notifications
+
+Sessions that end on their own say so on screen. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
+
+```
+awake notify ~/.local/bin/push-to-my-phone   # set it
+awake notify                                 # show it
+awake notify --clear                         # back to screen only
+```
+
+awake ships no such tool and has no opinion about which you use: a push service CLI, an SMS gateway, a two-line script that curls a webhook. Anything executable that accepts one string. The call is made **before** the kernel flag drops, so the request leaves while the network stack is still awake.
+
+## In your shell prompt
+
+`awake status --json` omits the `session` key entirely when nothing is running, which is all a prompt needs. Six lines of starship:
+
+```toml
+[custom.awake]
+when = "awake status --json | grep -q '\"session\":{'"
+command = "echo ☕"
+shell = ["bash", "--noprofile", "--norc"]
+format = "[$output]($style) "
+style = "yellow"
+```
+
 ## Development
 
 ```
