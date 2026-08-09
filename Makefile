@@ -8,8 +8,10 @@
 #   make notes      draft notes/$(VERSION).md from the commits (you then rewrite it)
 #   make release    signed, notarized, stapled dmg → tag → GitHub Release → cask
 #   make cask       bump the Homebrew cask to the built dmg (release does this)
+#   make icon       redraw Resources/awake.icns + icon.png from scripts/make-icon.swift
 
 BIN := .build/release/awake
+ICON := Resources/awake.icns
 LABEL := garden.untitled.awake
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
 PREFIX ?= $(HOME)/.local
@@ -23,7 +25,7 @@ APPBIN := $(APP)/Contents/MacOS/awake
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION := 0.1.1
+VERSION := 0.1.2
 
 DIST := dist
 RELEASE_APP := $(DIST)/awake.app
@@ -60,12 +62,13 @@ endef
 # Bundle assembly, used by BOTH install and release so the app you run and the
 # app you ship can never diverge. $(1) = destination .app
 define ASSEMBLE
-mkdir -p "$(1)/Contents/MacOS"; \
+mkdir -p "$(1)/Contents/MacOS" "$(1)/Contents/Resources"; \
 ditto "$(BIN)" "$(1)/Contents/MacOS/awake"; \
+ditto "$(ICON)" "$(1)/Contents/Resources/awake.icns"; \
 sed "s|__VERSION__|$(VERSION)|g" launchd/Info.plist.in > "$(1)/Contents/Info.plist"
 endef
 
-.PHONY: build check install uninstall clean notes release cask
+.PHONY: build check install uninstall clean notes release cask icon
 
 build:
 	@$(ACQUIRE); swift build -c release --product awake
@@ -73,7 +76,13 @@ build:
 check:
 	@$(ACQUIRE); swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
 
-install: build
+# The web surface wants the flat PNG too, so both fall out of one script.
+$(ICON) Resources/icon.png: scripts/make-icon.swift
+	@swift scripts/make-icon.swift
+
+icon: $(ICON)
+
+install: build $(ICON)
 	@mkdir -p "$(PREFIX)/bin" "$(HOME)/Library/Logs/awake"
 	@$(call ASSEMBLE,$(APP))
 	@# Developer ID gives a STABLE identity — TCC ties notification permission to the
@@ -116,7 +125,7 @@ notes:
 # Notarization is a credentialed act, so releasing is a LOCAL command: the
 # certificate is in this keychain and the notary key is in ~/.appstoreconnect,
 # neither of which belongs in CI. CI's job is the 0-warning gate, nothing more.
-release: check build
+release: check build $(ICON)
 	@test -z "$$(git status --porcelain)" || { echo "working tree is dirty"; exit 1; }
 	@! git rev-parse -q --verify "refs/tags/$(VERSION)" >/dev/null || { echo "tag $(VERSION) exists — bump VERSION"; exit 1; }
 	@test -f "$(NOTES)" || { echo "no $(NOTES) — run 'make notes', then write it"; exit 1; }
