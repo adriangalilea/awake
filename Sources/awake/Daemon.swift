@@ -198,6 +198,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         case .setFloor(let v):
             machine.setFloor(v)
             return Reply(ok: true, status: machine.status())
+        case .setNotifyCommand(let c):
+            machine.setNotifyCommand(c)
+            return Reply(ok: true, status: machine.status())
         }
     }
 
@@ -380,17 +383,19 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
 
     /// Screen always. The ends that fire while the lid is CLOSED also go out of
     /// band, because a screen notification behind a closed lid informs nobody.
-    /// That channel is an OPTIONAL hook: any executable at `~/.local/bin/notify`
-    /// taking one message argument (a push service, an SMS gateway, anything).
-    /// Absent, which is the default, it is simply skipped.
+    /// That channel is an OPTIONAL hook the user configures (`awake notify <path>`):
+    /// any executable taking one message argument. Unset is the default.
     static func notify(_ reason: EndReason) {
         guard let message = reason.message else { return }
         screenNotify(message)
         switch reason {
         case .batteryFloor, .lowPowerMode:
-            let hook = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".local/bin/notify").path
-            guard FileManager.default.isExecutableFile(atPath: hook) else { return }
+            let hook = Daemon.shared.machine.config.notifyCommand
+            guard !hook.isEmpty else { return }
+            guard FileManager.default.isExecutableFile(atPath: hook) else {
+                log("notify hook \(hook) is not executable")
+                return
+            }
             let r = AwakeKit.run(hook, ["awake: \(message)"])
             if r.status != 0 { log("notify hook failed: \(r.err)") }
         default:

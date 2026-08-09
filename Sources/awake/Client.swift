@@ -86,6 +86,27 @@ enum Client {
         print("battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
     }
 
+    /// No argument shows, a path sets, `--clear` removes. Always through the daemon:
+    /// it holds config in memory, so editing config.json by hand loses the edit.
+    static func notifyHook(_ args: [String]) {
+        let status: Status
+        switch args.first {
+        case nil:
+            status = send(.status).status
+        case "--clear":
+            status = send(.setNotifyCommand("")).status
+        case let path?:
+            let full = (path as NSString).expandingTildeInPath
+            guard FileManager.default.isExecutableFile(atPath: full) else {
+                die("not an executable file: \(full)")
+            }
+            status = send(.setNotifyCommand(full)).status
+        }
+        print(status.notifyCommand.isEmpty
+            ? "notify hook: none — closed-lid ends are screen-only"
+            : "notify hook: \(status.notifyCommand)")
+    }
+
     // MARK: - Parsing
 
     /// "HH:MM" wall-clock → the NEXT such time (today, or tomorrow if already past).

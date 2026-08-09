@@ -7,6 +7,7 @@ public enum Command: Codable, Sendable {
     case end
     case status
     case setFloor(Int)
+    case setNotifyCommand(String)
 }
 
 public struct Reply: Codable, Sendable {

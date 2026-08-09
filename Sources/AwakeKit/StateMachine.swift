@@ -46,6 +46,8 @@ public struct Status: Codable, Equatable, Sendable {
     public var sleepDisabled: Bool
     public var power: PowerSnapshot
     public var floor: Int
+    /// Empty when no out-of-band hook is configured.
+    public var notifyCommand: String
 }
 
 /// THE state machine. Intent lives here (and mirrored to disk); effect lives in the
@@ -170,6 +172,15 @@ public final class StateMachine {
         config.save()
     }
 
+    /// The out-of-band hook. Set through here, never by editing config.json by hand:
+    /// the daemon holds config in memory and the next save would clobber the edit.
+    public func setNotifyCommand(_ command: String) {
+        config.notifyCommand = command.trimmingCharacters(in: .whitespaces)
+        config.save()
+        log(config.notifyCommand.isEmpty ? "notify hook cleared"
+                                         : "notify hook set to \(config.notifyCommand)")
+    }
+
     public func setFloor(_ percent: Int) {
         let clamped = max(Config.floorRange.lowerBound, min(Config.floorRange.upperBound, percent))
         config.batteryFloorPercent = clamped
@@ -225,7 +236,8 @@ public final class StateMachine {
         return Status(session: session,
                       sleepDisabled: Kernel.sleepDisabled(),
                       power: Battery.snapshot(),
-                      floor: config.batteryFloorPercent)
+                      floor: config.batteryFloorPercent,
+                      notifyCommand: config.notifyCommand)
     }
 
     // MARK: - The choke point

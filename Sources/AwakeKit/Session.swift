@@ -39,7 +39,7 @@ public func procStartTime(_ pid: Int32) -> Double? {
     return Double(tv.tv_sec) + Double(tv.tv_usec) / 1_000_000
 }
 
-/// Intent: what Adrian asked for. Persisted so a crashed daemon re-arms on restart.
+/// Intent: what the user asked for. Persisted so a crashed daemon re-arms on restart.
 /// The kernel is the source of truth for EFFECT; this is the source of truth for WANT.
 public struct Session: Codable, Equatable, Sendable {
     public var modes: Set<Mode>
@@ -103,11 +103,18 @@ public struct Config: Codable, Equatable, Sendable {
     public var lastMinutes: Int
     /// Menu/hotkey engagements include the display mode when true.
     public var menuDisplay: Bool
+    /// Out-of-band notification for the ends that fire while the lid is CLOSED,
+    /// where a screen notification informs nobody. Any executable taking one
+    /// message argument: a push service, an SMS gateway, a webhook script.
+    /// Empty (the default) means screen only.
+    public var notifyCommand: String
 
-    public init(batteryFloorPercent: Int = 15, lastMinutes: Int = 0, menuDisplay: Bool = false) {
+    public init(batteryFloorPercent: Int = 15, lastMinutes: Int = 0, menuDisplay: Bool = false,
+                notifyCommand: String = "") {
         self.batteryFloorPercent = batteryFloorPercent
         self.lastMinutes = lastMinutes
         self.menuDisplay = menuDisplay
+        self.notifyCommand = notifyCommand
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +122,7 @@ public struct Config: Codable, Equatable, Sendable {
         batteryFloorPercent = try c.decodeIfPresent(Int.self, forKey: .batteryFloorPercent) ?? 15
         lastMinutes = try c.decodeIfPresent(Int.self, forKey: .lastMinutes) ?? 0
         menuDisplay = try c.decodeIfPresent(Bool.self, forKey: .menuDisplay) ?? false
+        notifyCommand = try c.decodeIfPresent(String.self, forKey: .notifyCommand) ?? ""
     }
 
     public static let floorRange = 0 ... 50
