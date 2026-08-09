@@ -1,9 +1,10 @@
-# The changelog grammar, and the reason it is not free-form markdown: these
-# notes are rendered as DESIGNED releases (a glyph per group), not dumped, so a
-# body without "### Group" sections and "- " items renders as a dated heading
-# with nothing underneath. git-cliff drafts into the grammar (`make notes`) and
-# a human rewrites the items; `make release` refuses anything that lost it.
-
+# The shape these notes must keep: the studio DESIGNS releases rather than
+# dumping markdown, so a body needs `### heading` lines with `- ` items. Prose
+# parses to zero groups and renders as a dated heading with nothing underneath.
+# The group NAMES below are the soft half: Added/Fixed/Changed/Performance/
+# Polish earn a designed glyph and colour, anything else still renders plainly.
+# git-cliff drafts into the shape (`make notes`), a human rewrites the items,
+# and `make release` refuses anything that lost it.
 [changelog]
 header = ""
 body = """
