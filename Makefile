@@ -1,0 +1,155 @@
+# awake — one state machine for keep-awake, menu bar + CLI.
+#
+#   make            build the binary (release)
+#   make check      compile everything, debug — the FAST typecheck (must be 0 warnings)
+#   make install    build + install binary, asleep symlink, launchd agent; restart daemon
+#   make uninstall  remove binary, symlink, launchd agent (sudoers grant: `awake grant --remove`)
+#   make clean      remove the build directory
+#   make notes      draft notes/$(VERSION).md from the commits (you then rewrite it)
+#   make release    signed, notarized, stapled dmg → tag → GitHub Release → cask
+#   make cask       bump the Homebrew cask to the built dmg (release does this)
+
+BIN := .build/release/awake
+LABEL := garden.untitled.awake
+PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
+PREFIX ?= $(HOME)/.local
+# The .app bundle exists for ONE reason: UNUserNotificationCenter refuses unbundled
+# processes. Assembled by hand (no Xcode), ad-hoc signed, lives in ~/Applications.
+# The CLI is a symlink into the bundle so daemon and CLI stay ONE binary.
+APP := $(HOME)/Applications/awake.app
+APPBIN := $(APP)/Contents/MacOS/awake
+
+# THE VERSION, single source of truth: it stamps Info.plist and names the tag.
+# A mac app has a native version field, so the manifest is truth here and the
+# tag is derived from it (the inverse of a Swift library, where the tag IS the
+# version because SwiftPM has no manifest field).
+VERSION := 0.1.0
+
+DIST := dist
+RELEASE_APP := $(DIST)/awake.app
+DMG := $(DIST)/awake-$(VERSION).dmg
+NOTES := notes/$(VERSION).md
+
+# The Homebrew tap holding the cask recipe. A separate repo because Homebrew
+# only discovers taps by the `homebrew-` name prefix, so it can never live here.
+TAP ?= $(HOME)/Developer/homebrew-tap
+
+# Discovered, never hardcoded, so a fork signs with its own certificate. Empty
+# on a machine with no Developer ID: `install` falls back to ad-hoc, `release`
+# refuses.
+SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null | \
+	sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
+
+# A keychain profile, so no notary identifier and no key path exists in this
+# repo or in any file. Create it once:
+#   xcrun notarytool store-credentials awake \
+#     --key ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 \
+#     --key-id <KEYID> --issuer <ISSUER-UUID>
+NOTARY_PROFILE ?= awake
+
+# THE BUILD MUTEX: concurrent `make` invocations serialize instead of fighting over
+# .build. A lock older than 10 minutes is stale (a killed make) and gets stolen.
+LOCK := $(patsubst %/,%,$(or $(TMPDIR),/tmp))/awake-build.lock
+define ACQUIRE
+while ! mkdir "$(LOCK)" 2>/dev/null; do \
+  if [ -n "$$(find "$(LOCK)" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then rmdir "$(LOCK)" 2>/dev/null || true; \
+  else sleep 2; fi; \
+done; trap 'rmdir "$(LOCK)" 2>/dev/null' EXIT
+endef
+
+# Bundle assembly, used by BOTH install and release so the app you run and the
+# app you ship can never diverge. $(1) = destination .app
+define ASSEMBLE
+mkdir -p "$(1)/Contents/MacOS"; \
+ditto "$(BIN)" "$(1)/Contents/MacOS/awake"; \
+sed "s|__VERSION__|$(VERSION)|g" launchd/Info.plist.in > "$(1)/Contents/Info.plist"
+endef
+
+.PHONY: build check install uninstall clean notes release cask
+
+build:
+	@$(ACQUIRE); swift build -c release --product awake
+
+check:
+	@$(ACQUIRE); swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
+
+install: build
+	@mkdir -p "$(PREFIX)/bin" "$(HOME)/Library/Logs/awake"
+	@$(call ASSEMBLE,$(APP))
+	@# Developer ID gives a STABLE identity — TCC ties notification permission to the
+	@# signature, and ad-hoc identities churn every rebuild (UNErrorDomain Code=1).
+	@# Falls back to ad-hoc on machines without the cert.
+	@codesign --force --sign "$(or $(SIGN_ID),-)" "$(APP)"
+	@# CLI = symlinks into the bundle: Bundle.main resolves through them, so the CLI
+	@# shares the daemon's defaults domain (hotkey remaps land where the daemon reads).
+	@ln -sf "$(APPBIN)" "$(PREFIX)/bin/awake"
+	@ln -sf "$(APPBIN)" "$(PREFIX)/bin/asleep"
+	@# The Claude skill ships with the app (_core skills convention: symlinked dir,
+	@# editing the repo updates the live skill).
+	@mkdir -p "$(HOME)/.claude/skills"
+	@ln -sfn "$(CURDIR)/skill" "$(HOME)/.claude/skills/awake"
+	@echo "installed $(APP) (+ awake, asleep symlinks, claude skill)"
+	@# The binary owns the launchd agent, not this Makefile: a cask's postflight
+	@# installs it the same way, and one implementation cannot drift from itself.
+	@"$(APPBIN)" agent install
+
+uninstall:
+	@if [ -x "$(APPBIN)" ]; then "$(APPBIN)" agent uninstall; \
+	else launchctl bootout "gui/$$(id -u)/$(LABEL)" 2>/dev/null || true; fi
+	@rm -rf "$(APP)"
+	@rm -f "$(PLIST)" "$(PREFIX)/bin/awake" "$(PREFIX)/bin/asleep"
+	@echo "removed app, symlinks, launchd agent. Sudoers grant: sudo rm /etc/sudoers.d/awake"
+
+clean:
+	@rm -rf .build $(DIST)
+
+# THE WORDS GATE: a release exists only once a human has written what changed.
+# git-cliff DRAFTS from the commits; the draft is raw material, not prose users
+# read. Rewrite it, commit it, and that file is the release notes forever.
+notes:
+	@command -v git-cliff >/dev/null || { echo "git-cliff missing: brew install git-cliff"; exit 1; }
+	@test ! -f "$(NOTES)" || { echo "$(NOTES) exists already — edit it"; exit 1; }
+	@mkdir -p notes
+	@git-cliff --unreleased --tag "$(VERSION)" -o "$(NOTES)"
+	@echo "drafted $(NOTES) — REWRITE it for humans, then commit it"
+
+# Notarization is a credentialed act, so releasing is a LOCAL command: the
+# certificate is in this keychain and the notary key is in ~/.appstoreconnect,
+# neither of which belongs in CI. CI's job is the 0-warning gate, nothing more.
+release: check build
+	@test -z "$$(git status --porcelain)" || { echo "working tree is dirty"; exit 1; }
+	@! git rev-parse -q --verify "refs/tags/$(VERSION)" >/dev/null || { echo "tag $(VERSION) exists — bump VERSION"; exit 1; }
+	@test -f "$(NOTES)" || { echo "no $(NOTES) — run 'make notes', then write it"; exit 1; }
+	@test -n "$(SIGN_ID)" || { echo "no 'Developer ID Application' certificate in the keychain"; exit 1; }
+	@xcrun notarytool history --keychain-profile "$(NOTARY_PROFILE)" >/dev/null 2>&1 || \
+		{ echo "no notary keychain profile '$(NOTARY_PROFILE)' — see the Makefile header"; exit 1; }
+	@rm -rf "$(DIST)" && mkdir -p "$(DIST)/stage"
+	@$(call ASSEMBLE,$(RELEASE_APP))
+	@# Hardened runtime + secure timestamp: notarization rejects anything less.
+	@codesign --force --options runtime --timestamp --sign "$(SIGN_ID)" "$(RELEASE_APP)"
+	@ditto -c -k --keepParent "$(RELEASE_APP)" "$(DIST)/awake.zip"
+	@xcrun notarytool submit "$(DIST)/awake.zip" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	@# The REAL verdict: stapling fails unless a ticket was actually issued, so
+	@# this is the check, not notarytool's exit status.
+	@xcrun stapler staple "$(RELEASE_APP)"
+	@cp -R "$(RELEASE_APP)" "$(DIST)/stage/" && ln -sf /Applications "$(DIST)/stage/Applications"
+	@hdiutil create -volname awake -srcfolder "$(DIST)/stage" -ov -format UDZO "$(DMG)" -quiet
+	@git tag -a "$(VERSION)" -m "$(VERSION)" && git push origin "$(VERSION)"
+	@gh release create "$(VERSION)" --title "$(VERSION)" --notes-file "$(NOTES)" "$(DMG)"
+	@$(MAKE) --no-print-directory cask
+	@echo "released $(VERSION): $(DMG)"
+
+# The cask points at the release asset by URL + sha256, so it can only be bumped
+# once the dmg is public. A fork without the tap checked out just skips it.
+cask:
+	@test -f "$(DMG)" || { echo "no $(DMG) — run 'make release'"; exit 1; }
+	@if [ ! -d "$(TAP)/.git" ]; then echo "no tap at $(TAP), skipping cask bump"; exit 0; fi
+	@sha=$$(shasum -a 256 "$(DMG)" | cut -d' ' -f1); \
+	sed -i '' \
+		-e "s|^  version .*|  version \"$(VERSION)\"|" \
+		-e "s|^  sha256 .*|  sha256 \"$$sha\"|" \
+		"$(TAP)/Casks/awake.rb"; \
+	git -C "$(TAP)" add Casks/awake.rb; \
+	git -C "$(TAP)" commit -q -m "awake $(VERSION)"; \
+	git -C "$(TAP)" push -q origin main; \
+	echo "cask bumped to $(VERSION) ($$sha)"

@@ -1,0 +1,15 @@
+{
+  "originHash" : "8fd1cf44e590f4a33a8c36030f05f53cd6652a0e64c514fa4d480ed964d8bbd9",
+  "pins" : [
+    {
+      "identity" : "swift-utils",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adriangalilea/swift-utils",
+      "state" : {
+        "revision" : "3ad33ae6f1f32636dde9570ad60b57aaa0bc258d",
+        "version" : "0.1.2"
+      }
+    }
+  ],
+  "version" : 3
+}

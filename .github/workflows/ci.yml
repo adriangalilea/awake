@@ -1,0 +1,19 @@
+# The only thing CI does. Releasing needs a signing certificate and a notary
+# key, so it happens locally (`make release`); nothing here touches a secret.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - run: make check

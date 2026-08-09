@@ -1,0 +1,18 @@
+# awake tasks (run from apps/awake): mise run check | build | install
+# Build logic lives in the Makefile; these are thin mise wrappers.
+
+[tasks.build]
+description = "Build the awake binary"
+run = "make build"
+
+[tasks.check]
+description = "Compile only — the 0-warning gate"
+run = "make check"
+
+[tasks.install]
+description = "Build and install binary + launchd daemon"
+run = "make install"
+
+[tasks.clean]
+description = "Remove the built binaries"
+run = "make clean"
