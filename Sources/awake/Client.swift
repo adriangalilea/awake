@@ -190,8 +190,48 @@ enum Client {
         return "\(s)s"
     }
 
-    /// The one human-readable claim line, shared by CLI, menu, tooltip and
-    /// notifications: owner first, then how it ends, then the display flare.
+    /// Menu/notification-grade summaries: one line per OWNER, "you" first, pids
+    /// demoted to a count — that surface answers who holds the Mac awake and until
+    /// when, and a process-table number answers neither. CLI rows keep pids (the
+    /// scripting surface; `awake off <pid>` needs them), and each summary carries
+    /// the full per-claim detail for tooltips.
+    static func summarize(_ claims: [Claim]) -> [(owner: String, label: String, detail: String)] {
+        var order: [String] = []
+        var groups: [String: [Claim]] = [:]
+        for c in claims {
+            if groups[c.owner] == nil {
+                if c.owner == Claim.humanOwner {
+                    order.insert(c.owner, at: 0)
+                } else {
+                    order.append(c.owner)
+                }
+            }
+            groups[c.owner, default: []].append(c)
+        }
+        return order.map { owner in
+            let g = groups[owner]!
+            let label: String
+            if g.count == 1 {
+                let c = g[0]
+                let how: String
+                switch c.term {
+                case .indefinite: how = "indefinite"
+                case .until(let d): how = "\(formatInterval(d.timeIntervalSinceNow)) left"
+                case .whilePid: how = "while it runs"
+                }
+                label = "\(owner) · \(how)\(c.modes.contains(.display) ? " · display on" : "")"
+            } else if g.allSatisfy({ if case .whilePid = $0.term { return true } else { return false } }) {
+                label = "\(owner) · while \(g.count) processes run"
+            } else {
+                label = "\(owner) · \(g.count) claims"
+            }
+            return (owner, label, g.map { describe($0) }.joined(separator: "\n"))
+        }
+    }
+
+    /// The full per-claim line for the CLI, logs and tooltips: owner first, then
+    /// how it ends (pid included — `awake off <pid>` needs it), then the display
+    /// flare.
     static func describe(_ c: Claim) -> String {
         let how: String
         switch c.term {

@@ -167,10 +167,11 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     private func menuTick() {
         guard let header = menu.items.first, !machine.claims.isEmpty else { return }
         header.title = Self.headerTitle(machine.claims)
+        let summaries = Client.summarize(machine.claims)
         for item in menu.items {
-            guard let id = item.representedObject as? UUID,
-                  let claim = machine.claims.first(where: { $0.id == id }) else { continue }
-            item.title = "   " + Client.describe(claim)
+            guard let owner = item.representedObject as? String,
+                  let s = summaries.first(where: { $0.owner == owner }) else { continue }
+            item.title = "   " + s.label
         }
     }
 
@@ -269,10 +270,25 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     }()
 
     private static func headerTitle(_ claims: [Claim]) -> String {
-        switch claims.count {
+        let summaries = Client.summarize(claims)
+        switch summaries.count {
         case 0: return "Asleep · normal sleep"
-        case 1: return "Awake · " + Client.describe(claims[0])
+        case 1: return "Awake · " + summaries[0].label
         default: return "Awake · \(claims.count) claims"
+        }
+    }
+
+    /// The duration of YOUR active claim, bucketed in minutes (0 = indefinite),
+    /// nil when you hold none. Drives the menu checkmark: state, never a default —
+    /// a checked duration with no matching claim reads as a session that isn't there.
+    private func yourDurationMinutes() -> Int? {
+        guard let c = machine.claims.first(where: { $0.owner == Claim.humanOwner }) else {
+            return nil
+        }
+        switch c.term {
+        case .indefinite: return 0
+        case .until(let d): return Int((d.timeIntervalSince(c.startedAt) / 60).rounded())
+        case .whilePid: return nil
         }
     }
 
@@ -311,15 +327,20 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         let header = NSMenuItem(title: Self.headerTitle(st.claims),
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
+        header.toolTip = st.claims.isEmpty ? nil
+            : st.claims.map { Client.describe($0) }.joined(separator: "\n")
         menu.addItem(header)
-        // Every claim gets its own line: who wants the Mac awake, and until when.
-        // One claim already fits in the header; a crowd gets the roster.
-        if st.claims.count > 1 {
-            for claim in st.claims {
-                let item = NSMenuItem(title: "   " + Client.describe(claim),
+        // The roster: one line per OWNER — who wants the Mac awake, and until when.
+        // A single owner already fits in the header; a crowd gets the list. Pids
+        // live in the tooltip, not the row.
+        let summaries = Client.summarize(st.claims)
+        if summaries.count > 1 {
+            for s in summaries {
+                let item = NSMenuItem(title: "   " + s.label,
                                       action: nil, keyEquivalent: "")
                 item.isEnabled = false
-                item.representedObject = claim.id
+                item.representedObject = s.owner
+                item.toolTip = s.detail
                 menu.addItem(item)
             }
         }
@@ -333,26 +354,35 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         }
         menu.addItem(.separator())
 
+        // The toggle gesture (right-click, ⌃⌥⌘A) lands on exactly one item, and that
+        // item wears the hotkey badge: "End all claims" while anything runs, else
+        // the duration it would start. Pressing the chord with the menu open does
+        // the same thing the global hotkey does — the badge is never a lie.
+        let toggleBadge = { (item: NSMenuItem) in
+            item.keyEquivalent = "a"
+            item.keyEquivalentModifierMask = [.control, .option, .command]
+        }
+
         if !st.claims.isEmpty {
-            let end = NSMenuItem(title: st.claims.count > 1
-                                     ? "End all \(st.claims.count) claims"
-                                     : "End session",
+            let end = NSMenuItem(title: st.claims.count > 1 ? "End all claims" : "End session",
                                  action: #selector(endClicked), keyEquivalent: "")
             end.target = self
+            toggleBadge(end)
             menu.addItem(end)
             menu.addItem(.separator())
         }
 
-        // The checkmark marks the duration right-click and ⌃⌥⌘A will use — the
-        // toggle's meaning, visible instead of folklore.
+        // The checkmark is STATE: your running claim's duration, nothing else.
+        // (A checkmark on a mere default reads as a claim that isn't there.)
+        let yours = yourDurationMinutes()
         for (title, minutes) in Self.durations {
             let item = NSMenuItem(title: title, action: #selector(engageClicked(_:)),
                                   keyEquivalent: "")
             item.target = self
             item.representedObject = minutes
-            item.state = machine.config.lastMinutes == minutes ? .on : .off
-            if machine.config.lastMinutes == minutes {
-                item.toolTip = "Right-click the cup or ⌃⌥⌘A starts this"
+            item.state = yours == minutes ? .on : .off
+            if st.claims.isEmpty, machine.config.lastMinutes == minutes {
+                toggleBadge(item)
             }
             menu.addItem(item)
         }
@@ -485,7 +515,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
                                remaining: [Claim]) -> String? {
         let still = remaining.isEmpty
             ? "Sleep restored."
-            : "Still awake: \(remaining.map { Client.describe($0) }.joined(separator: ", "))."
+            : "Still awake: \(Client.summarize(remaining).map(\.label).joined(separator: ", "))."
         switch reason {
         case .requested, .shutdown:
             return nil
