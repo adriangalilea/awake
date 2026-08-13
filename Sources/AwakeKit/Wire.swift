@@ -3,8 +3,10 @@ import Foundation
 /// One command per connection, one JSON line each way, then close. The CLI never
 /// mutates state itself; the daemon is the only brain.
 public enum Command: Codable, Sendable {
-    case engage(Session)
-    case end
+    case engage(Claim)
+    /// nil ends every claim (the human kill switch); a token ends the claims it
+    /// names — an owner-label prefix or a watched pid.
+    case end(String?)
     case status
     case setFloor(Int)
     case setNotifyCommand(String)
@@ -15,15 +17,21 @@ public struct Reply: Codable, Sendable {
     public var ok: Bool
     public var error: String?
     public var status: Status
-    /// The session a successful end/engage displaced — the undo breadcrumb rides the
-    /// wire so the client renders it from ONE round trip, race-free.
-    public var previous: Session?
+    /// Undo breadcrumbs ride the wire so the client renders them from ONE round
+    /// trip, race-free: the same-key claim an engage refreshed, the claim that
+    /// already made it redundant, and everything an end tore down.
+    public var replaced: Claim?
+    public var coveredBy: Claim?
+    public var ended: [Claim]?
 
-    public init(ok: Bool, error: String? = nil, status: Status, previous: Session? = nil) {
+    public init(ok: Bool, error: String? = nil, status: Status, replaced: Claim? = nil,
+                coveredBy: Claim? = nil, ended: [Claim]? = nil) {
         self.ok = ok
         self.error = error
         self.status = status
-        self.previous = previous
+        self.replaced = replaced
+        self.coveredBy = coveredBy
+        self.ended = ended
     }
 }
 

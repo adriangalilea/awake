@@ -24,15 +24,24 @@ enum Client {
     // MARK: - Commands
 
     static func engage(_ args: [String]) {
-        var modes = Session.defaultModes
-        // The persisted display preference applies EVERYWHERE (menu, hotkey, CLI);
-        // --display remains the explicit per-call opt-in on top.
-        if Config.load().menuDisplay { modes.insert(.display) }
+        // The standing display preference belongs to menu/hotkey gestures; from the
+        // shell, --display is the only way a claim lights the screen. A background
+        // agent's claim inheriting a display assertion is how a lid-closed Mac
+        // burns its battery to the floor.
+        var modes = Claim.defaultModes
         var term = Term.indefinite
+        var owner = Claim.humanOwner
         var rest = args
         if let i = rest.firstIndex(of: "--display") {
             modes.insert(.display)
             rest.remove(at: i)
+        }
+        if let i = rest.firstIndex(of: "--label") {
+            guard rest.count > i + 1, !rest[i + 1].isEmpty else {
+                die("usage: awake --label NAME ...")
+            }
+            owner = rest[i + 1]
+            rest.removeSubrange(i ... i + 1)
         }
         if let i = rest.firstIndex(of: "--until") {
             guard rest.count > i + 1, let date = parseUntil(rest[i + 1]) else {
@@ -47,6 +56,9 @@ enum Client {
             }
             guard let started = procStartTime(pid) else { die("no such process: \(pid)") }
             term = .whilePid(pid: pid, started: started)
+            // The watched process names the claim: "claude · while it runs", never
+            // a bare pid in the human's menu bar.
+            if owner == Claim.humanOwner { owner = procName(pid) ?? "pid \(pid)" }
             rest.removeSubrange(i ... i + 1)
         }
         if let token = rest.first {
@@ -56,16 +68,21 @@ enum Client {
             guard case .indefinite = term else { die("-w/--until and a duration are exclusive") }
             term = .until(Date().addingTimeInterval(seconds))
         }
-        let reply = send(.engage(Session(modes: modes, term: term, forced: true)))
+        let reply = send(.engage(Claim(owner: owner, forced: true, modes: modes, term: term)))
         if !reply.ok { die(reply.error ?? "engage failed") }
-        if let p = reply.previous { print(dim("replaced: \(describe(p))")) }
+        if let r = reply.replaced { print(dim("replaced own claim: \(describe(r))")) }
+        if let c = reply.coveredBy {
+            print(dim("already covered by \(describe(c)) · claim added, takes over if that ends"))
+        }
         render(reply.status)
     }
 
-    static func end() {
-        let reply = send(.end)
+    /// nil ends everything; a token ends the claims it names (owner prefix or pid).
+    static func end(_ token: String? = nil) {
+        let reply = send(.end(token))
+        if !reply.ok { die(reply.error ?? "end failed") }
         // The undo breadcrumb: what was running lands in the transcript/scrollback.
-        if let p = reply.previous { print(dim("ended: \(describe(p))")) }
+        for c in reply.ended ?? [] { print(dim("ended: \(describe(c))")) }
         render(reply.status)
     }
 
@@ -86,9 +103,8 @@ enum Client {
         print("battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
     }
 
-    /// No argument shows, `on`/`off` sets. The standing preference, not the
-    /// one-shot `--display` flag: this one survives and applies to the menu,
-    /// the hotkey and every CLI engagement.
+    /// No argument shows, `on`/`off` sets. The standing preference for menu and
+    /// hotkey engagements; shell claims use the one-shot `--display` flag.
     static func keepDisplay(_ args: [String]) {
         let status: Status
         switch args.first {
@@ -98,8 +114,8 @@ enum Client {
         default: die("usage: awake display [on|off]")
         }
         print(status.keepDisplay
-            ? "display: kept on for every session"
-            : "display: allowed to sleep (--display for one session)")
+            ? "display: kept on for menu/hotkey sessions (--display per CLI claim)"
+            : "display: allowed to sleep (--display for one claim)")
     }
 
     /// No argument shows, a path sets, `--clear` removes. Always through the daemon:
@@ -174,20 +190,27 @@ enum Client {
         return "\(s)s"
     }
 
-    static func describe(_ s: Session) -> String {
-        let modes = s.modes.map(\.rawValue).sorted().joined(separator: "+")
-        switch s.term {
-        case .indefinite: return "\(modes), indefinite"
-        case .until(let d): return "\(modes), \(formatInterval(d.timeIntervalSinceNow)) left"
-        case .whilePid(let pid, _): return "\(modes), while pid \(pid)"
+    /// The one human-readable claim line, shared by CLI, menu, tooltip and
+    /// notifications: owner first, then how it ends, then the display flare.
+    static func describe(_ c: Claim) -> String {
+        let how: String
+        switch c.term {
+        case .indefinite: how = "indefinite"
+        case .until(let d): how = "\(formatInterval(d.timeIntervalSinceNow)) left"
+        case .whilePid(let pid, _): how = "while it runs (pid \(pid))"
         }
+        return "\(c.owner) · \(how)\(c.modes.contains(.display) ? " · display on" : "")"
     }
 
     static func render(_ st: Status) {
-        if let s = st.session {
-            print(color("1;33", "☕ awake") + " — " + describe(s))
-        } else {
+        switch st.claims.count {
+        case 0:
             print(color("34", "💤 asleep") + " — Mac sleeps normally")
+        case 1:
+            print(color("1;33", "☕ awake") + " — " + describe(st.claims[0]))
+        default:
+            print(color("1;33", "☕ awake") + " — \(st.claims.count) claims")
+            for c in st.claims { print("   " + describe(c)) }
         }
         var env: [String] = []
         if st.power.hasBattery {
@@ -198,10 +221,10 @@ enum Client {
         if !env.isEmpty { print(dim("   " + env.joined(separator: " · "))) }
         // Intent and effect must agree; the daemon's tick heals divergence, so seeing
         // this line means something is actively wrong. Scream.
-        let wantLid = st.session?.modes.contains(.lid) ?? false
+        let wantLid = st.claims.contains { $0.modes.contains(.lid) }
         if wantLid != st.sleepDisabled {
             print(color("1;31",
-                "   ✗ DIVERGED: SleepDisabled=\(st.sleepDisabled) but session wants \(wantLid)"))
+                "   ✗ DIVERGED: SleepDisabled=\(st.sleepDisabled) but claims want \(wantLid)"))
         }
     }
 }

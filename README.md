@@ -5,16 +5,19 @@ Keep a Mac awake, **lid closed included**. One state machine, a menu bar cup and
 Every assertion-based tool (caffeinate, KeepingYouAwake, Lungo) dies the moment you close the lid, by design. Apple's own clamshell mode needs AC power plus an external display plus an input device. awake covers the case none of them do: a laptop on battery, lid shut, still working.
 
 ```
-awake            # keep awake, last used duration
+awake            # keep awake indefinitely
 awake 2h         # ...for two hours
 awake --until 23:30
-awake -w 4821    # ...until process 4821 exits
+awake -w 4821    # ...while process 4821 lives (the claim names itself after it)
 awake --display  # keep the screen on too
-asleep           # back to normal sleep
-awake status     # what's true right now (--json for scripts)
+asleep           # end every claim, back to normal sleep
+awake off make   # end just the claims matching an owner name or pid
+awake status     # every claim, what's true right now (--json for scripts)
 ```
 
-Right-click the menu bar cup to toggle at the last duration, or press ⌃⌥⌘A anywhere. Left-click for the menu.
+Intent is a set of **claims**: yours, an agent's process watch and a build's timer coexist instead of replacing each other. The Mac stays awake while any claim lives, sleep restores when the last one ends, and the menu bar lists who is holding it awake and why.
+
+Right-click the menu bar cup to end everything (or start your claim at the checkmarked duration), or press ⌃⌥⌘A anywhere. Left-click for the menu.
 
 ## Install
 
@@ -52,16 +55,16 @@ Lid-open keep-awake uses ordinary IOPMAssertions, which die with the process hol
 Because a flag that outlives its owner is dangerous, a resident daemon guards it:
 
 - **Effect** lives in the kernel. **Intent** lives in the daemon and is mirrored to disk, so a crashed daemon re-arms honestly instead of leaving your Mac permanently awake.
-- A **battery floor** (15% by default, `awake floor N`) always wins, even over an explicitly forced session.
-- Low Power Mode ends a session unless you forced it.
-- `-w PID` matches the process start time as well as the pid, so a recycled pid can never keep a dead process's session alive.
-- If you flip the flag by hand with `pmset`, awake adopts it as a session rather than silently undoing you.
+- A **battery floor** (15% by default, `awake floor N`) always wins and ends every claim.
+- Low Power Mode ends claims nobody forced.
+- `-w PID` matches the process start time as well as the pid, so a recycled pid can never keep a dead process's claim alive.
+- If you flip the flag by hand with `pmset`, awake adopts it as a claim rather than silently undoing you.
 
 This is why it is a daemon and not a one-shot command: a command that has exited cannot guard anything.
 
 ## Notifications
 
-Sessions that end on their own say so on screen. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
+Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
 
 ```
 awake notify ~/.local/bin/push-to-my-phone   # set it
@@ -73,11 +76,11 @@ awake ships no such tool and has no opinion about which you use: a push service 
 
 ## In your shell prompt
 
-`awake status --json` omits the `session` key entirely when nothing is running, which is all a prompt needs. Six lines of starship:
+`awake status --json` reports `"claims":[]` when nothing is running, which is all a prompt needs. Six lines of starship:
 
 ```toml
 [custom.awake]
-when = "awake status --json | grep -q '\"session\":{'"
+when = "awake status --json | grep -q '\"claims\":\\[{'"
 command = "echo ☕"
 shell = ["bash", "--noprofile", "--norc"]
 format = "[$output]($style) "

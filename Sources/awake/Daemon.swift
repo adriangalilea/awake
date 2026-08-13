@@ -42,7 +42,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     private var listenFd: Int32 = -1
     private var acceptSource: DispatchSourceRead!
     private var signalSources: [DispatchSourceSignal] = []
-    /// Ticks the header item while the menu is open — NSMenu never redraws otherwise.
+    /// Ticks the header + claim rows while the menu is open — NSMenu never redraws
+    /// otherwise.
     private var menuTicker: Timer?
     private var keymapStore: KeymapStore<AwakeAction>!
     private var hotkeys: GlobalHotkeys<AwakeAction>!
@@ -66,7 +67,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     func applicationDidFinishLaunching(_ notification: Notification) {
         log("daemon up (pid \(ProcessInfo.processInfo.processIdentifier))")
         machine.onChange = { [weak self] in self?.render() }
-        machine.notify = { Daemon.notify($0) }
+        machine.notify = { Daemon.notify($0, ended: $1, remaining: $2) }
 
         // Real notifications need the bundle; running the bare .build binary during
         // development keeps the osascript fallback.
@@ -114,7 +115,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
             let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
             src.setEventHandler {
                 MainActor.assumeIsolated {
-                    log("signal \(sig), parking session and exiting")
+                    log("signal \(sig), parking claims and exiting")
                     Daemon.shared.machine.park()
                     exit(0)
                 }
@@ -147,7 +148,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     @objc private func pollTick() { machine.tick() }
 
     // NSMenu freezes its titles at open; a 1 Hz ticker in .common mode (menu tracking
-    // runs the event-tracking runloop) keeps the countdown header honest while open.
+    // runs the event-tracking runloop) keeps countdowns honest while open.
     func menuWillOpen(_ menu: NSMenu) {
         let t = Timer(timeInterval: 1, repeats: true) { _ in
             DispatchQueue.main.async {
@@ -164,8 +165,13 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     }
 
     private func menuTick() {
-        guard let header = menu.items.first, let s = machine.session else { return }
-        header.title = "Awake — " + Client.describe(s)
+        guard let header = menu.items.first, !machine.claims.isEmpty else { return }
+        header.title = Self.headerTitle(machine.claims)
+        for item in menu.items {
+            guard let id = item.representedObject as? UUID,
+                  let claim = machine.claims.first(where: { $0.id == id }) else { continue }
+            item.title = "   " + Client.describe(claim)
+        }
     }
 
     @objc nonisolated private func powerStateChanged() {
@@ -178,21 +184,34 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
 
     private func handle(_ cmd: Command) -> Reply {
         switch cmd {
-        case .engage(let session):
-            let previous = machine.session
-            if let err = machine.engage(session) {
+        case .engage(let claim):
+            // No duration memory here, deliberately: the toggle default is the
+            // human's muscle memory and only menu/hotkey gestures may teach it.
+            switch machine.engage(claim) {
+            case .success(let e):
+                return Reply(ok: true, status: machine.status(),
+                             replaced: e.replaced, coveredBy: e.coveredBy)
+            case .failure(let err):
                 return Reply(ok: false, error: err.message, status: machine.status())
             }
-            if case .until(let d) = session.term {
-                machine.rememberDuration(Int(d.timeIntervalSince(session.startedAt) / 60))
-            } else if case .indefinite = session.term {
-                machine.rememberDuration(0)
+        case .end(let token):
+            let targets: [Claim]
+            if let token {
+                targets = Self.match(token, in: machine.claims)
+                if targets.isEmpty {
+                    let have = machine.claims.map { Client.describe($0) }
+                        .joined(separator: " · ")
+                    return Reply(ok: false,
+                                 error: machine.claims.isEmpty
+                                     ? "no claims to end"
+                                     : "no claim matches '\(token)' (have: \(have))",
+                                 status: machine.status())
+                }
+            } else {
+                targets = machine.claims
             }
-            return Reply(ok: true, status: machine.status(), previous: previous)
-        case .end:
-            let previous = machine.session
-            machine.end(.requested)
-            return Reply(ok: true, status: machine.status(), previous: previous)
+            machine.end(Set(targets.map(\.id)), .requested)
+            return Reply(ok: true, status: machine.status(), ended: targets)
         case .status:
             return Reply(ok: true, status: machine.status())
         case .setFloor(let v):
@@ -204,6 +223,16 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         case .setKeepDisplay(let on):
             setKeepDisplay(on)
             return Reply(ok: true, status: machine.status())
+        }
+    }
+
+    /// `awake off WHO`: an owner-label prefix or a watched pid, every claim it names.
+    private static func match(_ token: String, in claims: [Claim]) -> [Claim] {
+        let t = token.lowercased()
+        return claims.filter { claim in
+            if claim.owner.lowercased().hasPrefix(t) { return true }
+            if case .whilePid(let pid, _) = claim.term, String(pid) == token { return true }
+            return false
         }
     }
 
@@ -239,22 +268,35 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         return img!
     }()
 
+    private static func headerTitle(_ claims: [Claim]) -> String {
+        switch claims.count {
+        case 0: return "Asleep · normal sleep"
+        case 1: return "Awake · " + Client.describe(claims[0])
+        default: return "Awake · \(claims.count) claims"
+        }
+    }
+
     private func render() {
         rearmExpiryTimer()
         guard let button = statusItem.button else { return }
-        let active = machine.session != nil
-        button.image = active ? Self.onGlyph : Self.offGlyph
-        button.toolTip = active
-            ? "awake: " + Client.describe(machine.session!)
-            : "awake: off — Mac sleeps normally"
+        let claims = machine.claims
+        button.image = claims.isEmpty ? Self.offGlyph : Self.onGlyph
+        button.toolTip = claims.isEmpty
+            ? "awake: off — Mac sleeps normally"
+            : "awake: " + claims.map { Client.describe($0) }.joined(separator: "\n")
     }
 
-    /// Expiry deserves second-precision, not poll-tick precision.
+    /// Expiry deserves second-precision, not poll-tick precision. Armed for the
+    /// NEAREST deadline across all timed claims.
     private func rearmExpiryTimer() {
         expiryTimer?.invalidate()
         expiryTimer = nil
-        guard let s = machine.session, case .until(let d) = s.term else { return }
-        let interval = d.timeIntervalSinceNow + 0.5
+        let deadlines: [Date] = machine.claims.compactMap {
+            if case .until(let d) = $0.term { return d }
+            return nil
+        }
+        guard let next = deadlines.min() else { return }
+        let interval = next.timeIntervalSinceNow + 0.5
         guard interval > 0 else { return }
         expiryTimer = Timer.scheduledTimer(timeInterval: interval, target: self,
                                            selector: #selector(pollTick),
@@ -266,11 +308,21 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         menu.removeAllItems()
         let st = machine.status()
 
-        let header = NSMenuItem(title: st.session.map { "Awake — " + Client.describe($0) }
-                                    ?? "Asleep — normal sleep",
+        let header = NSMenuItem(title: Self.headerTitle(st.claims),
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
+        // Every claim gets its own line: who wants the Mac awake, and until when.
+        // One claim already fits in the header; a crowd gets the roster.
+        if st.claims.count > 1 {
+            for claim in st.claims {
+                let item = NSMenuItem(title: "   " + Client.describe(claim),
+                                      action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                item.representedObject = claim.id
+                menu.addItem(item)
+            }
+        }
         if st.power.hasBattery {
             let battery = NSMenuItem(
                 title: "Battery \(st.power.percent)%\(st.power.onAC ? " (AC)" : "")"
@@ -281,19 +333,27 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         }
         menu.addItem(.separator())
 
-        if st.session != nil {
-            let end = NSMenuItem(title: "End session", action: #selector(endClicked),
-                                 keyEquivalent: "")
+        if !st.claims.isEmpty {
+            let end = NSMenuItem(title: st.claims.count > 1
+                                     ? "End all \(st.claims.count) claims"
+                                     : "End session",
+                                 action: #selector(endClicked), keyEquivalent: "")
             end.target = self
             menu.addItem(end)
             menu.addItem(.separator())
         }
 
+        // The checkmark marks the duration right-click and ⌃⌥⌘A will use — the
+        // toggle's meaning, visible instead of folklore.
         for (title, minutes) in Self.durations {
             let item = NSMenuItem(title: title, action: #selector(engageClicked(_:)),
                                   keyEquivalent: "")
             item.target = self
             item.representedObject = minutes
+            item.state = machine.config.lastMinutes == minutes ? .on : .off
+            if machine.config.lastMinutes == minutes {
+                item.toolTip = "Right-click the cup or ⌃⌥⌘A starts this"
+            }
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -334,24 +394,28 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         statusItem.menu = nil
     }
 
-    /// Right-click and the global hotkey: Amphetamine's gesture, last-used duration.
+    /// Right-click and the global hotkey: the human kill switch, then the human
+    /// starter. Any claims at all → end them ALL (the gesture means "let it sleep");
+    /// none → start YOUR claim at the last menu-chosen duration.
     private func toggleSession() {
-        if machine.session != nil {
-            machine.end(.requested)
-        } else {
+        if machine.claims.isEmpty {
             engage(minutes: machine.config.lastMinutes)
+        } else {
+            machine.endAll(.requested)
         }
     }
 
     private func engage(minutes: Int) {
-        var modes = Session.defaultModes
+        var modes = Claim.defaultModes
         if machine.config.menuDisplay { modes.insert(.display) }
         let term: Term = minutes == 0 ? .indefinite
             : .until(Date().addingTimeInterval(TimeInterval(minutes * 60)))
-        if let err = machine.engage(Session(modes: modes, term: term, forced: true)) {
-            Daemon.screenNotify(err.message)
-        } else {
+        switch machine.engage(Claim(owner: Claim.humanOwner, forced: true,
+                                    modes: modes, term: term)) {
+        case .success:
             machine.rememberDuration(minutes)
+        case .failure(let err):
+            Daemon.screenNotify(err.message)
         }
     }
 
@@ -359,20 +423,23 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         engage(minutes: sender.representedObject as! Int)
     }
 
-    @objc private func endClicked() { machine.end(.requested) }
+    @objc private func endClicked() { machine.endAll(.requested) }
 
     @objc private func displayToggled() {
         setKeepDisplay(!machine.config.menuDisplay)
     }
 
-    /// The preference AND the running session, together: flipping it while a
-    /// session is up has to add or drop the assertion now, not at the next
-    /// engagement. Menu and CLI both land here so they cannot diverge.
+    /// The preference AND the running claims, together: flipping it while claims are
+    /// up has to add or drop the assertion now, not at the next engagement. It moves
+    /// the HUMAN's claims only — an agent's claim never lights the screen because a
+    /// menu checkbox says so. Menu and CLI both land here so they cannot diverge.
     func setKeepDisplay(_ on: Bool) {
         machine.setMenuDisplay(on)
-        if var s = machine.session {
-            if on { s.modes.insert(.display) } else { s.modes.remove(.display) }
-            if let err = machine.engage(s) { Daemon.screenNotify(err.message) }
+        for var claim in machine.claims where claim.owner == Claim.humanOwner {
+            if on { claim.modes.insert(.display) } else { claim.modes.remove(.display) }
+            if case .failure(let err) = machine.engage(claim) {
+                Daemon.screenNotify(err.message)
+            }
         }
     }
 
@@ -381,7 +448,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
     }
 
     @objc private func quitClicked() {
-        machine.end(.shutdown)
+        machine.endAll(.shutdown)
         // Bypass launchd KeepAlive: bootout unloads the agent instead of exit(0),
         // which would just resurrect us. `make install` brings it back.
         _ = AwakeKit.run("/bin/launchctl",
@@ -391,26 +458,63 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
 
     // MARK: - Notifications
 
-    /// Screen always. The ends that fire while the lid is CLOSED also go out of
-    /// band, because a screen notification behind a closed lid informs nobody.
-    /// That channel is an OPTIONAL hook the user configures (`awake notify <path>`):
-    /// any executable taking one message argument. Unset is the default.
-    static func notify(_ reason: EndReason) {
-        guard let message = reason.message else { return }
-        screenNotify(message)
-        switch reason {
-        case .batteryFloor, .lowPowerMode:
-            let hook = Daemon.shared.machine.config.notifyCommand
-            guard !hook.isEmpty else { return }
-            guard FileManager.default.isExecutableFile(atPath: hook) else {
-                log("notify hook \(hook) is not executable")
-                return
-            }
-            let r = AwakeKit.run(hook, ["awake: \(message)"])
-            if r.status != 0 { log("notify hook failed: \(r.err)") }
-        default:
-            break
+    /// The composer: (reason, ended, remaining) → one honest sentence, or silence.
+    /// "Sleep restored" is said ONLY when the last claim is gone. An agent's claim
+    /// ending under other claims is a non-event (log-only); YOUR claim ending while
+    /// others keep the Mac awake says so explicitly. Safety-net ends always speak,
+    /// and the closed-lid ones (battery floor, LPM) also go out of band through the
+    /// configured notify hook — sent BEFORE the flag drops so the push leaves on an
+    /// awake network stack.
+    static func notify(_ reason: EndReason, ended: [Claim], remaining: [Claim]) {
+        guard let message = composeMessage(reason, ended: ended, remaining: remaining) else {
+            return
         }
+        screenNotify(message)
+        guard reason.outOfBand else { return }
+        let hook = Daemon.shared.machine.config.notifyCommand
+        guard !hook.isEmpty else { return }
+        guard FileManager.default.isExecutableFile(atPath: hook) else {
+            log("notify hook \(hook) is not executable")
+            return
+        }
+        let r = AwakeKit.run(hook, ["awake: \(message)"])
+        if r.status != 0 { log("notify hook failed: \(r.err)") }
+    }
+
+    static func composeMessage(_ reason: EndReason, ended: [Claim],
+                               remaining: [Claim]) -> String? {
+        let still = remaining.isEmpty
+            ? "Sleep restored."
+            : "Still awake: \(remaining.map { Client.describe($0) }.joined(separator: ", "))."
+        switch reason {
+        case .requested, .shutdown:
+            return nil
+        case .batteryFloor(let p):
+            return "Battery at \(p)%. Sleep restored."
+        case .lowPowerMode:
+            return "Low Power Mode is on. \(still)"
+        case .externalOff:
+            return "Sleep was re-enabled outside awake. All claims ended."
+        case .expired:
+            guard remaining.isEmpty || ended.contains(where: { $0.owner == Claim.humanOwner })
+            else { return nil } // an agent's timer lapsing under other claims is a non-event
+            let labels = ended.map { expiredLabel($0) }.joined(separator: " and ")
+            return "\(labels) expired. \(still)"
+        case .pidExited(let pid):
+            // The last claim explaining why sleep came back is signal; an agent
+            // hand-off while others hold the machine is noise.
+            guard remaining.isEmpty, let claim = ended.first else { return nil }
+            return "\(claim.owner) (pid \(pid)) exited. Sleep restored."
+        }
+    }
+
+    /// "Your 2h claim" / "release's 8h claim" — the owner and the span it asked for.
+    private static func expiredLabel(_ c: Claim) -> String {
+        var span = ""
+        if case .until(let d) = c.term {
+            span = " \(Client.formatInterval(d.timeIntervalSince(c.startedAt)))"
+        }
+        return c.owner == Claim.humanOwner ? "Your\(span) claim" : "\(c.owner)'s\(span) claim"
     }
 
     static func screenNotify(_ message: String) {
