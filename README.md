@@ -10,14 +10,16 @@ awake 2h         # ...for two hours
 awake --until 23:30
 awake -w 4821    # ...while process 4821 lives (the claim names itself after it)
 awake --display  # keep the screen on too
-asleep           # end every claim, back to normal sleep
+awake suspend    # let it sleep now; every claim is kept and comes back on resume
+awake resume     # lift that switch
+asleep           # END every claim, back to normal sleep
 awake off make   # end just the claims matching an owner name or pid
 awake status     # every claim, what's true right now (--json for scripts)
 ```
 
 Intent is a set of **claims**: yours, an agent's process watch and a build's timer coexist instead of replacing each other. The Mac stays awake while any claim lives, sleep restores when the last one ends, and the menu bar lists who is holding it awake and why.
 
-Right-click the menu bar cup to end everything (or start your claim at the checkmarked duration), or press ⌃⌥⌘A anywhere. Left-click for the menu.
+Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle: with claims running it **suspends** (the Mac sleeps normally, nothing anyone wanted is forgotten, and a claim that arrives meanwhile waits too); suspended, it resumes everything and starts your claim at the checkmarked duration; with nothing running it starts yours. Ending claims for good is a separate, explicit act (`asleep`, "End all claims" in the menu), never a gesture that reads as reversible. Left-click for the menu.
 
 ## Install
 
@@ -55,7 +57,7 @@ Lid-open keep-awake uses ordinary IOPMAssertions, which die with the process hol
 Because a flag that outlives its owner is dangerous, a resident daemon guards it:
 
 - **Effect** lives in the kernel. **Intent** lives in the daemon and is mirrored to disk, so a crashed daemon re-arms honestly instead of leaving your Mac permanently awake.
-- A **battery floor** (15% by default, `awake floor N`) always wins and ends every claim.
+- A **battery floor** (15% by default, `awake floor N`) always wins and ends every claim. And because ending claims only *lets* the Mac sleep, if it is still awake below the floor with the display dark, something else (audio on the speakers, a download) is holding an idle assertion, and awake puts the Mac to sleep itself rather than watch it drain from the floor to hibernation.
 - Low Power Mode ends claims nobody forced.
 - `-w PID` matches the process start time as well as the pid, so a recycled pid can never keep a dead process's claim alive.
 - If you flip the flag by hand with `pmset`, awake adopts it as a claim rather than silently undoing you.
@@ -64,7 +66,7 @@ This is why it is a daemon and not a one-shot command: a command that has exited
 
 ## Notifications
 
-Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
+Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Banners are real system notifications, posted by a tiny helper app inside the bundle (macOS refuses them to a launchd agent, which the daemon has to be); the one-time permission prompt comes at install, with a first banner that says what will arrive there. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
 
 ```
 awake notify ~/.local/bin/push-to-my-phone   # set it
