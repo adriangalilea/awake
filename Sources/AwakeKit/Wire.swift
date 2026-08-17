@@ -11,6 +11,9 @@ public enum Command: Codable, Sendable {
     case setFloor(Int)
     case setNotifyCommand(String)
     case setKeepDisplay(Bool)
+    /// The human's "let it sleep" switch: claims kept, effect off / back on.
+    case suspend
+    case resume
 }
 
 public struct Reply: Codable, Sendable {

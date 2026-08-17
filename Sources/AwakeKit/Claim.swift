@@ -151,6 +151,9 @@ public enum Paths {
     public static let stateDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".local/state/awake")
     public static let claimsFile = stateDir.appendingPathComponent("claims.json")
+    /// The human's suspend switch, its own file: orthogonal to the claim set and
+    /// absent whenever the switch is off, so claims.json keeps its shape.
+    public static let suspendFile = stateDir.appendingPathComponent("suspended.json")
     public static let configFile = stateDir.appendingPathComponent("config.json")
     public static let socket = stateDir.appendingPathComponent("awake.sock")
     public static let sudoers = "/etc/sudoers.d/awake"
@@ -239,6 +242,38 @@ public enum ClaimStore {
     public static func clear() {
         try? FileManager.default.removeItem(at: Paths.claimsFile)
     }
+}
+
+/// The suspend switch on disk: the ISO date it was thrown, or no file. Never
+/// spans a reboot: like claims, intent from before the boot is stale by design.
+public enum SuspendStore {
+    public static func load() -> Date? {
+        guard let data = try? Data(contentsOf: Paths.suspendFile),
+              let since = try? JSONDecoder.iso.decode(Date.self, from: data) else { return nil }
+        guard since >= bootTime() else {
+            log("suspend switch predates this boot, clearing")
+            save(nil)
+            return nil
+        }
+        return since
+    }
+
+    public static func save(_ since: Date?) {
+        guard let since else {
+            try? FileManager.default.removeItem(at: Paths.suspendFile)
+            return
+        }
+        Paths.ensureStateDir()
+        try! JSONEncoder.iso.encode(since).write(to: Paths.suspendFile, options: .atomic)
+    }
+}
+
+extension JSONDecoder {
+    static let iso: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
+}
+
+extension JSONEncoder {
+    static let iso: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e }()
 }
 
 /// One log line shape everywhere: ISO timestamp, then the message. The daemon's

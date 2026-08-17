@@ -4,7 +4,6 @@ import Foundation
 import IOKit.ps
 import Keymap
 import SwiftUI
-import UserNotifications
 
 /// The Keymap contract: one action, one spec. The global default follows the library's
 /// modifier doctrine — a deliberate heavy chord on the identity initial (⌃⌥⌘A).
@@ -27,12 +26,8 @@ enum AwakeAction: String, ActionSet {
 /// timers. Run by launchd (`garden.untitled.awake`), KeepAlive restarts it on crash
 /// and startup reconciliation makes that restart honest.
 @MainActor
-final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
-                    UNUserNotificationCenterDelegate {
+final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static var shared: Daemon!
-    /// True once UNUserNotificationCenter authorization is granted. Requires the .app
-    /// bundle; nil bundle or denied auth falls back to osascript.
-    private static var notificationsAuthorized = false
 
     let machine = StateMachine()
     private var statusItem: NSStatusItem!
@@ -68,20 +63,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         log("daemon up (pid \(ProcessInfo.processInfo.processIdentifier))")
         machine.onChange = { [weak self] in self?.render() }
         machine.notify = { Daemon.notify($0, ended: $1, remaining: $2) }
+        machine.onForcedSleep = { Daemon.notifyForcedSleep(percent: $0) }
 
-        // Real notifications need the bundle; running the bare .build binary during
-        // development keeps the osascript fallback.
-        if Bundle.main.bundleIdentifier != nil {
-            let center = UNUserNotificationCenter.current()
-            center.delegate = self
-            center.requestAuthorization(options: [.alert, .sound]) { granted, err in
-                DispatchQueue.main.async {
-                    Daemon.notificationsAuthorized = granted
-                    if let err { log("notification authorization failed: \(err)") }
-                    log("notifications: \(granted ? "UNUserNotificationCenter" : "osascript fallback")")
-                }
-            }
-        }
+        log("notifications: \(Self.notifierApp.map { "awake-notifier at \($0.path)" } ?? "osascript fallback (bare binary, no bundle)")")
 
         keymapStore = KeymapStore<AwakeAction>()
         hotkeys = GlobalHotkeys(store: keymapStore) { [weak self] action in
@@ -166,7 +150,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
 
     private func menuTick() {
         guard let header = menu.items.first, !machine.claims.isEmpty else { return }
-        header.title = Self.headerTitle(machine.claims)
+        header.title = Self.headerTitle(machine.claims, suspended: machine.suspended)
         let summaries = Client.summarize(machine.claims)
         for item in menu.items {
             guard let owner = item.representedObject as? String,
@@ -224,6 +208,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         case .setKeepDisplay(let on):
             setKeepDisplay(on)
             return Reply(ok: true, status: machine.status())
+        case .suspend:
+            machine.suspend()
+            return Reply(ok: true, status: machine.status())
+        case .resume:
+            machine.resume()
+            return Reply(ok: true, status: machine.status())
         }
     }
 
@@ -269,8 +259,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         return img!
     }()
 
-    private static func headerTitle(_ claims: [Claim]) -> String {
+    private static func headerTitle(_ claims: [Claim], suspended: Bool) -> String {
         let summaries = Client.summarize(claims)
+        if suspended {
+            return claims.isEmpty ? "Sleeping · suspended by you"
+                : "Sleeping · \(claims.count) claim\(claims.count == 1 ? "" : "s") suspended by you"
+        }
         switch summaries.count {
         case 0: return "Asleep · normal sleep"
         case 1: return "Awake · " + summaries[0].label
@@ -296,10 +290,14 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         rearmExpiryTimer()
         guard let button = statusItem.button else { return }
         let claims = machine.claims
-        button.image = claims.isEmpty ? Self.offGlyph : Self.onGlyph
-        button.toolTip = claims.isEmpty
-            ? "awake: off — Mac sleeps normally"
-            : "awake: " + claims.map { Client.describe($0) }.joined(separator: "\n")
+        // The glyph is EFFECT: suspended reads as off (the Mac does sleep normally);
+        // the tooltip carries the intent that is waiting underneath.
+        button.image = claims.isEmpty || machine.suspended ? Self.offGlyph : Self.onGlyph
+        let roster = claims.map { Client.describe($0) }.joined(separator: "\n")
+        button.toolTip = machine.suspended
+            ? "awake: suspended by you — Mac sleeps normally"
+                + (claims.isEmpty ? "" : "\nwaiting: " + roster.replacingOccurrences(of: "\n", with: "\nwaiting: "))
+            : claims.isEmpty ? "awake: off — Mac sleeps normally" : "awake: " + roster
     }
 
     /// Expiry deserves second-precision, not poll-tick precision. Armed for the
@@ -324,7 +322,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         menu.removeAllItems()
         let st = machine.status()
 
-        let header = NSMenuItem(title: Self.headerTitle(st.claims),
+        let header = NSMenuItem(title: Self.headerTitle(st.claims, suspended: machine.suspended),
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
         header.toolTip = st.claims.isEmpty ? nil
@@ -363,11 +361,27 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
             item.keyEquivalentModifierMask = [.control, .option, .command]
         }
 
-        if !st.claims.isEmpty {
+        // Three shapes. Suspended: "Resume" wears the badge (the toggle lifts the
+        // switch and starts yours). Claims running: "Let it sleep" wears the badge
+        // (suspend, keep everyone's intent), "End all claims" beneath it is the
+        // explicit nuke. Nothing running: the duration the toggle would start.
+        if machine.suspended {
+            let resume = NSMenuItem(title: "Resume" + (st.claims.isEmpty ? "" : " (\(st.claims.count) waiting)"),
+                                    action: #selector(resumeClicked), keyEquivalent: "")
+            resume.target = self
+            toggleBadge(resume)
+            menu.addItem(resume)
+            menu.addItem(.separator())
+        } else if !st.claims.isEmpty {
+            let sleep = NSMenuItem(title: "Let it sleep",
+                                   action: #selector(suspendClicked), keyEquivalent: "")
+            sleep.target = self
+            sleep.toolTip = "Sleep normally now; every claim is kept and comes back on Resume"
+            toggleBadge(sleep)
+            menu.addItem(sleep)
             let end = NSMenuItem(title: st.claims.count > 1 ? "End all claims" : "End session",
                                  action: #selector(endClicked), keyEquivalent: "")
             end.target = self
-            toggleBadge(end)
             menu.addItem(end)
             menu.addItem(.separator())
         }
@@ -381,7 +395,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
             item.target = self
             item.representedObject = minutes
             item.state = yours == minutes ? .on : .off
-            if st.claims.isEmpty, machine.config.lastMinutes == minutes {
+            if st.claims.isEmpty, !machine.suspended, machine.config.lastMinutes == minutes {
                 toggleBadge(item)
             }
             menu.addItem(item)
@@ -424,16 +438,26 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         statusItem.menu = nil
     }
 
-    /// Right-click and the global hotkey: the human kill switch, then the human
-    /// starter. Any claims at all → end them ALL (the gesture means "let it sleep");
-    /// none → start YOUR claim at the last menu-chosen duration.
+    /// Right-click and the global hotkey. Suspended → resume, and start YOUR claim
+    /// at the last menu-chosen duration (the gesture means "keep it awake", and it
+    /// is symmetric with the off gesture: everyone's intent comes back, yours is
+    /// added). Claims running → suspend: the Mac sleeps normally, nothing is
+    /// forgotten, a `/clear` in some agent tab cannot silently re-arm what you
+    /// switched off. Nothing running → start yours. Ending claims for good is the
+    /// explicit menu item / `asleep`, never a gesture that reads as reversible.
     private func toggleSession() {
-        if machine.claims.isEmpty {
+        if machine.suspended {
+            machine.resume()
+            engage(minutes: machine.config.lastMinutes)
+        } else if machine.claims.isEmpty {
             engage(minutes: machine.config.lastMinutes)
         } else {
-            machine.endAll(.requested)
+            machine.suspend()
         }
     }
+
+    @objc private func suspendClicked() { machine.suspend() }
+    @objc private func resumeClicked() { machine.resume() }
 
     private func engage(minutes: Int) {
         var modes = Claim.defaultModes
@@ -511,6 +535,17 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         if r.status != 0 { log("notify hook failed: \(r.err)") }
     }
 
+    /// The floor's second net spoke: out of band always (the display is dark by
+    /// construction, nobody sees a banner), screen too for the log of record.
+    static func notifyForcedSleep(percent: Int) {
+        let message = "Battery at \(percent)%, under the floor, still awake with the display dark. Sleeping now."
+        screenNotify(message)
+        let hook = Daemon.shared.machine.config.notifyCommand
+        guard !hook.isEmpty, FileManager.default.isExecutableFile(atPath: hook) else { return }
+        let r = AwakeKit.run(hook, ["awake: \(message)"])
+        if r.status != 0 { log("notify hook failed: \(r.err)") }
+    }
+
     static func composeMessage(_ reason: EndReason, ended: [Claim],
                                remaining: [Claim]) -> String? {
         let still = remaining.isEmpty
@@ -547,27 +582,30 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate,
         return c.owner == Claim.humanOwner ? "Your\(span) claim" : "\(c.owner)'s\(span) claim"
     }
 
+    /// The nested notifier app, present only when running from the assembled bundle
+    /// (the Makefile puts it in Contents/Helpers). nil = bare .build binary in dev.
+    private static let notifierApp: URL? = {
+        guard Bundle.main.bundleIdentifier != nil else { return nil }
+        let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/awake-notifier.app")
+        return FileManager.default.isExecutableFile(atPath: url.appendingPathComponent("Contents/MacOS/awake-notifier").path) ? url : nil
+    }()
+
+    /// A banner on screen. The real path is the nested awake-notifier.app, launched
+    /// by LaunchServices per message (`open -g -n`: background, fresh instance every
+    /// time so two ends in one second are two banners): UNUserNotificationCenter is
+    /// only reachable from an LS-launched user-context app, never from this launchd
+    /// agent (Apple DTS, forums 804854; verified 2026-08 with a Developer ID
+    /// signature, lsregister and an LS launch: UNErrorDomain Code=1 every time).
+    /// The bare development binary has no bundle and no helper: osascript, which
+    /// rides Script Editor's notification permission and is not the product.
     static func screenNotify(_ message: String) {
-        guard notificationsAuthorized else {
-            precondition(!message.contains("\""), "notification message would break osascript quoting")
-            let script = "display notification \"\(message)\" with title \"awake\""
-            _ = AwakeKit.run("/usr/bin/osascript", ["-e", script])
+        if let app = notifierApp {
+            let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", app.path, "--args", message])
+            if r.status != 0 { log("awake-notifier launch failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))") }
             return
         }
-        let content = UNMutableNotificationContent()
-        content.title = "awake"
-        content.body = message
-        content.sound = .default
-        UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-    }
-
-    /// Accessory app counts as foreground — without this the banner never shows.
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .sound])
+        precondition(!message.contains("\""), "notification message would break osascript quoting")
+        let script = "display notification \"\(message)\" with title \"awake\""
+        _ = AwakeKit.run("/usr/bin/osascript", ["-e", script])
     }
 }

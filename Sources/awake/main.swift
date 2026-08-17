@@ -14,7 +14,9 @@ its own claim, and sleep restores when the last one ends.
   awake -w PID          while a process lives (agents, builds); named after it
   awake --label NAME .. name the claim (who wants this; default "you", -w names itself)
   awake --display ...   also keep the display on for this claim
-  asleep | awake off    end EVERY claim, restore normal sleep
+  awake suspend         let it sleep: every claim kept, effect off (= right-click / ⌃⌥⌘A)
+  awake resume          lift the switch, claims take effect again
+  asleep | awake off    END every claim, restore normal sleep
   awake off WHO         end matching claims only (owner prefix or pid)
   awake status [--json] all claims + effect + battery, honestly
   awake floor N         battery floor percent (0 disables)
@@ -26,8 +28,11 @@ its own claim, and sleep restores when the last one ends.
   awake agent install   write + bootstrap the launchd agent for THIS binary
   awake agent uninstall stop it and remove the plist
 
-Global hotkey (default ⌃⌥⌘A) and right-click on the menu bar cup toggle: end
-every claim if any exist, else start yours at the last menu-chosen duration.
+Global hotkey (default ⌃⌥⌘A) and right-click on the menu bar cup toggle: claims
+running → suspend (sleep normally, nothing forgotten); suspended → resume and
+start yours at the last menu-chosen duration; nothing running → start yours.
+Battery floor: at the floor every claim ends; if the Mac is still awake below it
+with the display dark (someone else's assertion), it is put to sleep.
 """
 
 let rawArgs = CommandLine.arguments
@@ -50,6 +55,10 @@ case "status":
     Client.status(json: args.contains("--json"))
 case "off":
     Client.end(args.count > 1 ? args[1] : nil)
+case "suspend":
+    Client.suspend()
+case "resume":
+    Client.resume()
 case "floor":
     guard args.count == 2, let v = Int(args[1]) else { Client.die("usage: awake floor <percent>") }
     Client.setFloor(v)

@@ -86,6 +86,11 @@ enum Client {
         render(reply.status)
     }
 
+    /// The human's "let it sleep" switch from the shell (same thing as the
+    /// right-click / hotkey). Claims stay; only the effect goes.
+    static func suspend() { render(send(.suspend).status) }
+    static func resume() { render(send(.resume).status) }
+
     static func status(json: Bool = false) {
         let st = send(.status).status
         if json {
@@ -243,14 +248,20 @@ enum Client {
     }
 
     static func render(_ st: Status) {
-        switch st.claims.count {
-        case 0:
-            print(color("34", "💤 asleep") + " — Mac sleeps normally")
-        case 1:
-            print(color("1;33", "☕ awake") + " — " + describe(st.claims[0]))
-        default:
-            print(color("1;33", "☕ awake") + " — \(st.claims.count) claims")
-            for c in st.claims { print("   " + describe(c)) }
+        if let since = st.suspendedSince {
+            print(color("34", "💤 sleeping") + " — suspended by you \(formatInterval(Date().timeIntervalSince(since))) ago"
+                + (st.claims.isEmpty ? "" : " · \(st.claims.count) claim\(st.claims.count == 1 ? "" : "s") waiting for `awake resume` / right-click"))
+            for c in st.claims { print(dim("   waiting: " + describe(c))) }
+        } else {
+            switch st.claims.count {
+            case 0:
+                print(color("34", "💤 asleep") + " — Mac sleeps normally")
+            case 1:
+                print(color("1;33", "☕ awake") + " — " + describe(st.claims[0]))
+            default:
+                print(color("1;33", "☕ awake") + " — \(st.claims.count) claims")
+                for c in st.claims { print("   " + describe(c)) }
+            }
         }
         var env: [String] = []
         if st.power.hasBattery {
@@ -261,7 +272,7 @@ enum Client {
         if !env.isEmpty { print(dim("   " + env.joined(separator: " · "))) }
         // Intent and effect must agree; the daemon's tick heals divergence, so seeing
         // this line means something is actively wrong. Scream.
-        let wantLid = st.claims.contains { $0.modes.contains(.lid) }
+        let wantLid = st.suspendedSince == nil && st.claims.contains { $0.modes.contains(.lid) }
         if wantLid != st.sleepDisabled {
             print(color("1;31",
                 "   ✗ DIVERGED: SleepDisabled=\(st.sleepDisabled) but claims want \(wantLid)"))
