@@ -30,7 +30,7 @@ brew install --cask adriangalilea/tap/awake
 awake grant
 ```
 
-Or from source:
+Or the dmg from [awake.untitled.garden](https://awake.untitled.garden), or from source:
 
 ```
 git clone https://github.com/adriangalilea/awake
@@ -95,7 +95,7 @@ style = "yellow"
 make check     # compile, the fast gate
 make install   # build + install + restart the daemon
 make notes     # draft notes/<version>.md from the commits
-make release   # signed, notarized, stapled dmg → tag → GitHub Release
+make release   # signed, notarized, stapled dmg → tag → GitHub Release → garden → cask
 ```
 
 Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect notary key, neither of which belongs in CI, so CI only runs `make check`. Both live in the keychain, nothing on disk and nothing in this repo. Set the notary profile up once:
@@ -106,7 +106,7 @@ xcrun notarytool store-credentials awake \
   --key-id <KEYID> --issuer <ISSUER-UUID>
 ```
 
-`notes/<version>.md` is the release notes, written by hand and committed. git-cliff only drafts it.
+`notes/<version>.md` is the release notes, written by hand and committed. git-cliff only drafts it. The dmg is served through `awake.untitled.garden/releases/<file>` (the cask points there too), which counts each download before redirecting to the CDN; GitHub keeps a copy of the asset.
 
 ## Prior art
 

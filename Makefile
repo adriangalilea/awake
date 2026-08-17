@@ -7,6 +7,7 @@
 #   make clean      remove the build directory
 #   make notes      draft notes/$(VERSION).md from the commits (you then rewrite it)
 #   make release    signed, notarized, stapled dmg → tag → GitHub Release → cask
+#   make publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden (release does this)
 #   make cask       bump the Homebrew cask to the built dmg (release does this)
 #   make icon       redraw Resources/awake.icns + icon.png from scripts/make-icon.swift
 
@@ -26,7 +27,7 @@ APPBIN := $(APP)/Contents/MacOS/awake
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION := 0.2.0
+VERSION := 0.3.0
 
 DIST := dist
 RELEASE_APP := $(DIST)/awake.app
@@ -36,6 +37,13 @@ NOTES := notes/$(VERSION).md
 # The Homebrew tap holding the cask recipe. A separate repo because Homebrew
 # only discovers taps by the `homebrew-` name prefix, so it can never live here.
 TAP ?= $(HOME)/Developer/homebrew-tap
+# The untitled garden monorepo: its release tool is the ONE writer to the R2
+# bucket behind <slug>.untitled.garden/releases/<file>, the download URL that is
+# COUNTED (garden KPI `download`), and `pnpm garden notes` syncs notes/<v>.md
+# to the surface's release rows. The cask points at that URL, never at GitHub,
+# so every brew install is a counted download. A fork without the checkout
+# skips both and its downloads simply go unmeasured.
+GARDEN ?= $(HOME)/Developer/untitled
 
 # Discovered, never hardcoded, so a fork signs with its own certificate. Empty
 # on a machine with no Developer ID: `install` falls back to ad-hoc, `release`
@@ -76,7 +84,7 @@ ditto "$(ICON)" "$(1)/Contents/Helpers/awake-notifier.app/Contents/Resources/awa
 sed "s|__VERSION__|$(VERSION)|g" launchd/Notifier-Info.plist.in > "$(1)/Contents/Helpers/awake-notifier.app/Contents/Info.plist"
 endef
 
-.PHONY: build check install uninstall clean notes release cask icon
+.PHONY: build check install uninstall clean notes release publish cask icon
 
 build:
 	@$(ACQUIRE); swift build -c release
@@ -163,8 +171,18 @@ release: check build $(ICON)
 	@hdiutil create -volname awake -srcfolder "$(DIST)/stage" -ov -format UDZO "$(DMG)" -quiet
 	@git tag -a "$(VERSION)" -m "$(VERSION)" && git push origin "$(VERSION)"
 	@gh release create "$(VERSION)" --title "$(VERSION)" --notes-file "$(NOTES)" "$(DMG)"
+	@$(MAKE) --no-print-directory publish
 	@$(MAKE) --no-print-directory cask
 	@echo "released $(VERSION): $(DMG)"
+
+# The garden half of a release: the dmg behind the counted download URL, the
+# notes on the surface. Publish BEFORE the cask bump: the cask's URL is this
+# one, and brew fetches it the moment the tap updates.
+publish:
+	@test -f "$(DMG)" || { echo "no $(DMG) — run 'make release'"; exit 1; }
+	@if [ ! -d "$(GARDEN)/tools/release" ]; then echo "no garden at $(GARDEN), skipping publish (downloads uncounted)"; exit 0; fi
+	@url=$$(pnpm --dir "$(GARDEN)/tools/release" exec tsx dmg.ts awake "$(CURDIR)/$(DMG)") && echo "published $$url"
+	@cd "$(GARDEN)" && pnpm --silent garden notes awake
 
 # The cask points at the release asset by URL + sha256, so it can only be bumped
 # once the dmg is public. A fork without the tap checked out just skips it.
