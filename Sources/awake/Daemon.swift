@@ -65,7 +65,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         machine.notify = { Daemon.notify($0, ended: $1, remaining: $2) }
         machine.onForcedSleep = { Daemon.notifyForcedSleep(percent: $0) }
 
-        log("notifications: \(Self.notifierApp.map { "awake-notifier at \($0.path)" } ?? "osascript fallback (bare binary, no bundle)")")
+        log("notifications: \(Self.notifierApp.map { "awake-notifier at \($0.path)" } ?? "log only (bare binary, no bundle)")")
 
         keymapStore = KeymapStore<AwakeAction>()
         hotkeys = GlobalHotkeys(store: keymapStore) { [weak self] action in
@@ -638,22 +638,19 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return FileManager.default.isExecutableFile(atPath: url.appendingPathComponent("Contents/MacOS/awake-notifier").path) ? url : nil
     }()
 
-    /// A banner on screen. The real path is the nested awake-notifier.app, launched
-    /// by LaunchServices per message (`open -g -n`: background, fresh instance every
-    /// time so two ends in one second are two banners): UNUserNotificationCenter is
-    /// only reachable from an LS-launched user-context app, never from this launchd
-    /// agent (Apple DTS, forums 804854; verified 2026-08 with a Developer ID
-    /// signature, lsregister and an LS launch: UNErrorDomain Code=1 every time).
-    /// The bare development binary has no bundle and no helper: osascript, which
-    /// rides Script Editor's notification permission and is not the product.
+    /// A banner on screen: the nested awake-notifier.app, launched by LaunchServices
+    /// per message (`open -g -n`: background, fresh instance every time so two ends in
+    /// one second are two banners). UNUserNotificationCenter is only reachable from an
+    /// LS-launched user-context app, never from this launchd agent (Apple DTS, forums
+    /// 804854; verified 2026-08 with a Developer ID signature, lsregister and an LS
+    /// launch: UNErrorDomain Code=1 every time). The bare development binary has no
+    /// bundle and no helper: the message goes to the log, and that is all it gets.
     static func screenNotify(_ message: String) {
-        if let app = notifierApp {
-            let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", app.path, "--args", message])
-            if r.status != 0 { log("awake-notifier launch failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))") }
+        guard let app = notifierApp else {
+            log("notify (no bundle, no helper): \(message)")
             return
         }
-        precondition(!message.contains("\""), "notification message would break osascript quoting")
-        let script = "display notification \"\(message)\" with title \"awake\""
-        _ = AwakeKit.run("/usr/bin/osascript", ["-e", script])
+        let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", app.path, "--args", message])
+        if r.status != 0 { log("awake-notifier launch failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))") }
     }
 }
