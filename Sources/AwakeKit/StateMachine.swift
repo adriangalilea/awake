@@ -54,6 +54,10 @@ public struct Status: Codable, Equatable, Sendable {
     /// The human's "let it sleep" switch (right-click, hotkey, `awake suspend`):
     /// every claim is kept but inert until resumed. nil = not suspended.
     public var suspendedSince: Date?
+    /// The daily version check (awake.untitled.garden/appcast.xml) and the
+    /// newest version it has reported, nil until the first successful check.
+    public var updateCheck: Bool
+    public var latestVersion: String?
 }
 
 /// THE state machine. Intent lives here (and mirrored to disk) as a SET of claims;
@@ -342,7 +346,41 @@ public final class StateMachine {
                       floor: config.batteryFloorPercent,
                       notifyCommand: config.notifyCommand,
                       keepDisplay: config.menuDisplay,
-                      suspendedSince: suspendedSince)
+                      suspendedSince: suspendedSince,
+                      updateCheck: config.updateCheck,
+                      latestVersion: config.latestVersion)
+    }
+
+    // MARK: - Update check (the active-install ping, and the human's upgrade nudge)
+
+    public func setUpdateCheck(_ on: Bool) {
+        config.updateCheck = on
+        config.save()
+        log("update check \(on ? "on (daily)" : "off")")
+    }
+
+    public var updateCheckDue: Bool {
+        config.updateCheck && (config.nextUpdateCheck.map { $0 <= Date() } ?? true)
+    }
+
+    /// Record a feed read. Returns the version to announce, if this one is
+    /// newer than `running` and has not been announced before.
+    public func recordUpdateCheck(latest: String?, running: String) -> String? {
+        if let latest {
+            config.nextUpdateCheck = Date().addingTimeInterval(24 * 3600)
+            config.latestVersion = latest
+            var announce: String? = nil
+            if versionIsNewer(latest, than: running), config.updateAnnounced != latest {
+                config.updateAnnounced = latest
+                announce = latest
+            }
+            config.save()
+            log("update check: latest \(latest), running \(running)\(announce != nil ? ", announcing" : "")")
+            return announce
+        }
+        config.nextUpdateCheck = Date().addingTimeInterval(3600)
+        config.save()
+        return nil
     }
 
     // MARK: - The choke point

@@ -129,7 +129,52 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         machine.park()
     }
 
-    @objc private func pollTick() { machine.tick() }
+    @objc private func pollTick() {
+        machine.tick()
+        checkForUpdate()
+    }
+
+    // MARK: - Update check
+
+    /// The bundle's own version; nil for the bare development binary, which
+    /// therefore never phones anywhere.
+    static let runningVersion: String? =
+        Bundle.main.bundleIdentifier == nil ? nil
+        : Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+
+    private static let feed = URL(string: "https://awake.untitled.garden/appcast.xml")!
+    private var updateInFlight = false
+
+    /// One GET a day against the owned appcast (`updates off` stops it). The
+    /// GET is the whole payload: the server counts it as an active install for
+    /// the day under a salted IP hash and 302s to the feed. If the feed names a
+    /// newer version than this bundle, say so once, through the notifier, and
+    /// point at brew. Failure reschedules an hour out and is log-only.
+    private func checkForUpdate() {
+        guard let running = Self.runningVersion, machine.updateCheckDue, !updateInFlight else { return }
+        updateInFlight = true
+        var req = URLRequest(url: Self.feed, timeoutInterval: 10)
+        req.setValue("awake/\(running)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { data, response, error in
+            let latest: String? = {
+                guard error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200,
+                      let data, let text = String(data: data, encoding: .utf8) else { return nil }
+                // Element form (our hand-written feed) or attribute form (generate_appcast).
+                let m = text.range(of: #"shortVersionString(?:>|=")(\d+\.\d+\.\d+)"#, options: .regularExpression)
+                return m.flatMap { text[$0].range(of: #"\d+\.\d+\.\d+"#, options: .regularExpression).map { String(text[$0]) } }
+            }()
+            if latest == nil { log("update check failed: \(error.map { "\($0)" } ?? "unparseable feed / HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")") }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    let d = Daemon.shared!
+                    d.updateInFlight = false
+                    if let announce = d.machine.recordUpdateCheck(latest: latest, running: running) {
+                        Daemon.screenNotify("awake \(announce) is out, you run \(running). brew upgrade --cask awake, or awake.untitled.garden")
+                    }
+                }
+            }
+        }.resume()
+    }
 
     // NSMenu freezes its titles at open; a 1 Hz ticker in .common mode (menu tracking
     // runs the event-tracking runloop) keeps countdowns honest while open.
@@ -213,6 +258,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return Reply(ok: true, status: machine.status())
         case .resume:
             machine.resume()
+            return Reply(ok: true, status: machine.status())
+        case .setUpdateCheck(let on):
+            machine.setUpdateCheck(on)
             return Reply(ok: true, status: machine.status())
         }
     }

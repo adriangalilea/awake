@@ -64,6 +64,10 @@ Because a flag that outlives its owner is dangerous, a resident daemon guards it
 
 This is why it is a daemon and not a one-shot command: a command that has exited cannot guard anything.
 
+## Update check
+
+Once a day the daemon fetches `awake.untitled.garden/appcast.xml`. That GET is the entire payload: no identifier, no usage data, nothing about your Mac. The server keeps a salted, non-reversible hash of the caller's IP for that day so the garden can count active installs (never the IP itself), and answers with the feed. If the feed names a newer version than the one you run, awake says so once, on screen, and points at `brew upgrade --cask awake`. `awake status` shows the same nudge. `awake updates off` stops the check, and with it the ping.
+
 ## Notifications
 
 Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Banners are real system notifications, posted by a tiny helper app inside the bundle (macOS refuses them to a launchd agent, which the daemon has to be); the one-time permission prompt comes at install, with a first banner that says what will arrive there. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:

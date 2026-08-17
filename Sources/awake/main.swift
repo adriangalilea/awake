@@ -22,6 +22,7 @@ its own claim, and sleep restores when the last one ends.
   awake floor N         battery floor percent (0 disables)
   awake display [on|off] standing "keep the screen on" for menu/hotkey sessions
   awake notify [CMD]    out-of-band hook for closed-lid ends (--clear removes)
+  awake updates [on|off] the daily version check (one GET, counts as an active install)
   awake hotkey [COMBO]  show/remap the global toggle (--reset for default)
   awake grant           install the scoped sudoers grant (once)
   awake grant --remove  remove it · --force reinstalls over an existing rule
@@ -66,6 +67,8 @@ case "display":
     Client.keepDisplay(Array(args.dropFirst()))
 case "notify":
     Client.notifyHook(Array(args.dropFirst()))
+case "updates":
+    Client.updates(Array(args.dropFirst()))
 case "hotkey":
     Hotkey.run(Array(args.dropFirst()))
 case "help", "-h", "--help":

@@ -184,13 +184,25 @@ public struct Config: Codable, Equatable, Sendable {
     /// message argument: a push service, an SMS gateway, a webhook script.
     /// Empty (the default) means screen only.
     public var notifyCommand: String
+    /// The daily version check against awake.untitled.garden/appcast.xml. One
+    /// GET a day, no payload; the server keeps a salted hash of the caller's IP
+    /// for that day to count active installs (never the IP). Off = silent.
+    public var updateCheck: Bool
+    /// When the next check is due (nil = due now). Success schedules a day
+    /// ahead, failure an hour, so a flaky network is not hammered every tick.
+    public var nextUpdateCheck: Date?
+    /// The newest version the feed has reported, and the one already announced
+    /// on screen (each new version is announced exactly once).
+    public var latestVersion: String?
+    public var updateAnnounced: String?
 
     public init(batteryFloorPercent: Int = 15, lastMinutes: Int = 0, menuDisplay: Bool = false,
-                notifyCommand: String = "") {
+                notifyCommand: String = "", updateCheck: Bool = true) {
         self.batteryFloorPercent = batteryFloorPercent
         self.lastMinutes = lastMinutes
         self.menuDisplay = menuDisplay
         self.notifyCommand = notifyCommand
+        self.updateCheck = updateCheck
     }
 
     public init(from decoder: Decoder) throws {
@@ -199,6 +211,10 @@ public struct Config: Codable, Equatable, Sendable {
         lastMinutes = try c.decodeIfPresent(Int.self, forKey: .lastMinutes) ?? 0
         menuDisplay = try c.decodeIfPresent(Bool.self, forKey: .menuDisplay) ?? false
         notifyCommand = try c.decodeIfPresent(String.self, forKey: .notifyCommand) ?? ""
+        updateCheck = try c.decodeIfPresent(Bool.self, forKey: .updateCheck) ?? true
+        nextUpdateCheck = try c.decodeIfPresent(Date.self, forKey: .nextUpdateCheck)
+        latestVersion = try c.decodeIfPresent(String.self, forKey: .latestVersion)
+        updateAnnounced = try c.decodeIfPresent(String.self, forKey: .updateAnnounced)
     }
 
     public static let floorRange = 0 ... 50
@@ -274,6 +290,17 @@ extension JSONDecoder {
 
 extension JSONEncoder {
     static let iso: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e }()
+}
+
+/// "0.4.0" > "0.3.10" by numeric components; a missing component is 0.
+public func versionIsNewer(_ a: String, than b: String) -> Bool {
+    let pa = a.split(separator: ".").map { Int($0) ?? 0 }
+    let pb = b.split(separator: ".").map { Int($0) ?? 0 }
+    for i in 0 ..< max(pa.count, pb.count) {
+        let x = i < pa.count ? pa[i] : 0, y = i < pb.count ? pb[i] : 0
+        if x != y { return x > y }
+    }
+    return false
 }
 
 /// One log line shape everywhere: ISO timestamp, then the message. The daemon's

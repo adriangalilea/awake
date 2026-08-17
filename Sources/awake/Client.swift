@@ -91,6 +91,17 @@ enum Client {
     static func suspend() { render(send(.suspend).status) }
     static func resume() { render(send(.resume).status) }
 
+    /// `awake updates [on|off]`: the daily version check (= the active-install
+    /// ping). Bare form prints the current setting and the newest known version.
+    static func updates(_ args: [String]) {
+        switch args.first {
+        case "on": render(send(.setUpdateCheck(true)).status)
+        case "off": render(send(.setUpdateCheck(false)).status)
+        case nil: render(send(.status).status)
+        default: die("usage: awake updates [on|off]")
+        }
+    }
+
     static func status(json: Bool = false) {
         let st = send(.status).status
         if json {
@@ -270,6 +281,14 @@ enum Client {
             if st.power.lowPowerMode { env.append("low power mode") }
         }
         if !env.isEmpty { print(dim("   " + env.joined(separator: " · "))) }
+        // The upgrade nudge, from the daemon's last feed read; the check itself
+        // is one GET a day (awake updates off silences it).
+        let running = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        if !st.updateCheck {
+            print(dim("   update check off"))
+        } else if let latest = st.latestVersion, let running, versionIsNewer(latest, than: running) {
+            print(color("1;33", "   ⬆ awake \(latest) is out (you run \(running)) · brew upgrade --cask awake"))
+        }
         // Intent and effect must agree; the daemon's tick heals divergence, so seeing
         // this line means something is actively wrong. Scream.
         let wantLid = st.suspendedSince == nil && st.claims.contains { $0.modes.contains(.lid) }

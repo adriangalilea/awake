@@ -14,6 +14,7 @@ public enum Command: Codable, Sendable {
     /// The human's "let it sleep" switch: claims kept, effect off / back on.
     case suspend
     case resume
+    case setUpdateCheck(Bool)
 }
 
 public struct Reply: Codable, Sendable {

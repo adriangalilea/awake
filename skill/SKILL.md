@@ -22,6 +22,7 @@ asleep                # end EVERY claim, restore normal sleep (= awake off)
 awake off WHO         # end matching claims only (owner prefix or pid)
 awake status --json   # machine-readable claims + effect + battery
 awake floor N         # battery floor percent (0 disables)
+awake updates [on|off] # daily version check (one GET a day; the human's setting, leave it)
 ```
 
 ## Rules for agents
