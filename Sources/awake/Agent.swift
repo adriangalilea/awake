@@ -43,6 +43,23 @@ enum Agent {
             Client.die("launchctl bootstrap failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))")
         }
         print("✓ daemon bootstrapped (\(Paths.launchdLabel)) → \(binaryPath)")
+        prime()
+    }
+
+    /// Ask for notification permission NOW, in context, with the human at the
+    /// keyboard and an intro banner that says what will arrive here, instead of
+    /// letting the first real event (a battery-floor end at 3am behind a closed
+    /// lid, prompt unseen, message lost) be the first ask. The notifier itself
+    /// makes this a no-op once the person has answered, so re-installs never nag.
+    private static func prime() {
+        let bundle = URL(fileURLWithPath: binaryPath).deletingLastPathComponent().deletingLastPathComponent()
+        let notifier = bundle.appendingPathComponent("Helpers/awake-notifier.app")
+        guard FileManager.default.isExecutableFile(
+            atPath: notifier.appendingPathComponent("Contents/MacOS/awake-notifier").path) else { return }
+        let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", notifier.path, "--args", "--prime"])
+        if r.status != 0 {
+            print("⚠ notification prompt could not be launched: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
     }
 
     static func uninstall() {

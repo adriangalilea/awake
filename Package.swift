@@ -23,5 +23,9 @@ let package = Package(
             "AwakeKit",
             .product(name: "Keymap", package: "swift-utils"),
         ]),
+        // The notification hop: a separate .app nested in the bundle, LS-launched per
+        // message so UNUserNotificationCenter sees a user-context app, not a launchd
+        // agent. Knows nothing about awake; takes one string, posts it, exits.
+        .executableTarget(name: "awake-notifier"),
     ]
 )

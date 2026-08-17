@@ -11,6 +11,7 @@
 #   make icon       redraw Resources/awake.icns + icon.png from scripts/make-icon.swift
 
 BIN := .build/release/awake
+NOTIFIER_BIN := .build/release/awake-notifier
 ICON := Resources/awake.icns
 LABEL := garden.untitled.awake
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
@@ -61,17 +62,24 @@ endef
 
 # Bundle assembly, used by BOTH install and release so the app you run and the
 # app you ship can never diverge. $(1) = destination .app
+# The notifier is a second, nested .app (Contents/Helpers/awake-notifier.app): the
+# notification hop needs an LS-launched user-context app, and the daemon is a launchd
+# agent by design. Same icon, own bundle id, its own Info.plist.
 define ASSEMBLE
 mkdir -p "$(1)/Contents/MacOS" "$(1)/Contents/Resources"; \
 ditto "$(BIN)" "$(1)/Contents/MacOS/awake"; \
 ditto "$(ICON)" "$(1)/Contents/Resources/awake.icns"; \
-sed "s|__VERSION__|$(VERSION)|g" launchd/Info.plist.in > "$(1)/Contents/Info.plist"
+sed "s|__VERSION__|$(VERSION)|g" launchd/Info.plist.in > "$(1)/Contents/Info.plist"; \
+mkdir -p "$(1)/Contents/Helpers/awake-notifier.app/Contents/MacOS" "$(1)/Contents/Helpers/awake-notifier.app/Contents/Resources"; \
+ditto "$(NOTIFIER_BIN)" "$(1)/Contents/Helpers/awake-notifier.app/Contents/MacOS/awake-notifier"; \
+ditto "$(ICON)" "$(1)/Contents/Helpers/awake-notifier.app/Contents/Resources/awake.icns"; \
+sed "s|__VERSION__|$(VERSION)|g" launchd/Notifier-Info.plist.in > "$(1)/Contents/Helpers/awake-notifier.app/Contents/Info.plist"
 endef
 
 .PHONY: build check install uninstall clean notes release cask icon
 
 build:
-	@$(ACQUIRE); swift build -c release --product awake
+	@$(ACQUIRE); swift build -c release
 
 check:
 	@$(ACQUIRE); swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
@@ -88,6 +96,10 @@ install: build $(ICON)
 	@# Developer ID gives a STABLE identity — TCC ties notification permission to the
 	@# signature, and ad-hoc identities churn every rebuild (UNErrorDomain Code=1).
 	@# Falls back to ad-hoc on machines without the cert.
+	@# Inner first, then outer: a nested app must carry its own signature before the
+	@# enclosing bundle is sealed over it. Notification permission is tied to the
+	@# NOTIFIER's identity, so a stable Developer ID matters most on that one.
+	@codesign --force --sign "$(or $(SIGN_ID),-)" "$(APP)/Contents/Helpers/awake-notifier.app"
 	@codesign --force --sign "$(or $(SIGN_ID),-)" "$(APP)"
 	@# CLI = symlinks into the bundle: Bundle.main resolves through them, so the CLI
 	@# shares the daemon's defaults domain (hotkey remaps land where the daemon reads).
@@ -140,6 +152,7 @@ release: check build $(ICON)
 	@rm -rf "$(DIST)" && mkdir -p "$(DIST)/stage"
 	@$(call ASSEMBLE,$(RELEASE_APP))
 	@# Hardened runtime + secure timestamp: notarization rejects anything less.
+	@codesign --force --options runtime --timestamp --sign "$(SIGN_ID)" "$(RELEASE_APP)/Contents/Helpers/awake-notifier.app"
 	@codesign --force --options runtime --timestamp --sign "$(SIGN_ID)" "$(RELEASE_APP)"
 	@ditto -c -k --keepParent "$(RELEASE_APP)" "$(DIST)/awake.zip"
 	@xcrun notarytool submit "$(DIST)/awake.zip" --keychain-profile "$(NOTARY_PROFILE)" --wait
