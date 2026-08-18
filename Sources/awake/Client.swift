@@ -12,9 +12,10 @@ enum Client {
     /// kickstart -k also recovers a wedged daemon (alive but not accepting).
     static func send(_ cmd: Command) -> Reply {
         if let r = Wire.roundTrip(cmd) { return r }
-        _ = AwakeKit.run("/bin/launchctl",
-                         ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
-        for _ in 0 ..< 50 {
+        _ = AwakeKit.run(
+            "/bin/launchctl",
+            ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
+        for _ in 0..<50 {
             usleep(100_000)
             if let r = Wire.roundTrip(cmd) { return r }
         }
@@ -41,14 +42,14 @@ enum Client {
                 die("usage: awake --label NAME ...")
             }
             owner = rest[i + 1]
-            rest.removeSubrange(i ... i + 1)
+            rest.removeSubrange(i...i + 1)
         }
         if let i = rest.firstIndex(of: "--until") {
             guard rest.count > i + 1, let date = parseUntil(rest[i + 1]) else {
                 die("usage: awake --until HH:MM")
             }
             term = .until(date)
-            rest.removeSubrange(i ... i + 1)
+            rest.removeSubrange(i...i + 1)
         }
         if let i = rest.firstIndex(of: "-w") {
             guard rest.count > i + 1, let pid = Int32(rest[i + 1]) else {
@@ -59,7 +60,7 @@ enum Client {
             // The watched process names the claim: "claude · while it runs", never
             // a bare pid in the human's menu bar.
             if owner == Claim.humanOwner { owner = procName(pid) ?? "pid \(pid)" }
-            rest.removeSubrange(i ... i + 1)
+            rest.removeSubrange(i...i + 1)
         }
         if let token = rest.first {
             guard rest.count == 1, let seconds = parseDuration(token) else {
@@ -116,7 +117,8 @@ enum Client {
 
     static func setFloor(_ v: Int) {
         let reply = send(.setFloor(v))
-        print("battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
+        print(
+            "battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
     }
 
     /// No argument shows, `on`/`off` sets. The standing preference for menu and
@@ -129,9 +131,10 @@ enum Client {
         case "off": status = send(.setKeepDisplay(false)).status
         default: die("usage: awake display [on|off]")
         }
-        print(status.keepDisplay
-            ? "display: kept on for menu/hotkey sessions (--display per CLI claim)"
-            : "display: allowed to sleep (--display for one claim)")
+        print(
+            status.keepDisplay
+                ? "display: kept on for menu/hotkey sessions (--display per CLI claim)"
+                : "display: allowed to sleep (--display for one claim)")
     }
 
     /// No argument shows, a path sets, `--clear` removes. Always through the daemon:
@@ -150,9 +153,10 @@ enum Client {
             }
             status = send(.setNotifyCommand(full)).status
         }
-        print(status.notifyCommand.isEmpty
-            ? "notify hook: none — closed-lid ends are screen-only"
-            : "notify hook: \(status.notifyCommand)")
+        print(
+            status.notifyCommand.isEmpty
+                ? "notify hook: none — closed-lid ends are screen-only"
+                : "notify hook: \(status.notifyCommand)")
     }
 
     // MARK: - Parsing
@@ -161,7 +165,8 @@ enum Client {
     static func parseUntil(_ s: String) -> Date? {
         let parts = s.split(separator: ":")
         guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]),
-              (0 ... 23).contains(h), (0 ... 59).contains(m) else { return nil }
+            (0...23).contains(h), (0...59).contains(m)
+        else { return nil }
         let cal = Calendar.current
         var c = cal.dateComponents([.year, .month, .day], from: Date())
         c.hour = h
@@ -200,7 +205,9 @@ enum Client {
 
     static func formatInterval(_ t: TimeInterval) -> String {
         let total = max(0, Int(t.rounded(.up)))
-        let h = total / 3600, m = (total % 3600) / 60, s = total % 60
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
         if h > 0 { return "\(h)h \(m)m" }
         if m > 0 { return "\(m)m" }
         return "\(s)s"
@@ -236,7 +243,9 @@ enum Client {
                 case .whilePid: how = "while it runs"
                 }
                 label = "\(owner) · \(how)\(c.modes.contains(.display) ? " · display on" : "")"
-            } else if g.allSatisfy({ if case .whilePid = $0.term { return true } else { return false } }) {
+            } else if g.allSatisfy({
+                if case .whilePid = $0.term { return true } else { return false }
+            }) {
                 label = "\(owner) · while \(g.count) processes run"
             } else {
                 label = "\(owner) · \(g.count) claims"
@@ -260,8 +269,13 @@ enum Client {
 
     static func render(_ st: Status) {
         if let since = st.suspendedSince {
-            print(color("34", "💤 sleeping") + " — suspended by you \(formatInterval(Date().timeIntervalSince(since))) ago"
-                + (st.claims.isEmpty ? "" : " · \(st.claims.count) claim\(st.claims.count == 1 ? "" : "s") waiting for `awake resume` / right-click"))
+            print(
+                color("34", "💤 sleeping")
+                    + " — suspended by you \(formatInterval(Date().timeIntervalSince(since))) ago"
+                    + (st.claims.isEmpty
+                        ? ""
+                        : " · \(st.claims.count) claim\(st.claims.count == 1 ? "" : "s") waiting for `awake resume` / right-click")
+            )
             for c in st.claims { print(dim("   waiting: " + describe(c))) }
         } else {
             switch st.claims.count {
@@ -286,15 +300,21 @@ enum Client {
         let running = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         if !st.updateCheck {
             print(dim("   update check off"))
-        } else if let latest = st.latestVersion, let running, versionIsNewer(latest, than: running) {
-            print(color("1;33", "   ⬆ awake \(latest) is out (you run \(running)) · brew upgrade --cask awake"))
+        } else if let latest = st.latestVersion, let running, versionIsNewer(latest, than: running)
+        {
+            print(
+                color(
+                    "1;33",
+                    "   ⬆ awake \(latest) is out (you run \(running)) · brew upgrade --cask awake"))
         }
         // Intent and effect must agree; the daemon's tick heals divergence, so seeing
         // this line means something is actively wrong. Scream.
         let wantLid = st.suspendedSince == nil && st.claims.contains { $0.modes.contains(.lid) }
         if wantLid != st.sleepDisabled {
-            print(color("1;31",
-                "   ✗ DIVERGED: SleepDisabled=\(st.sleepDisabled) but claims want \(wantLid)"))
+            print(
+                color(
+                    "1;31",
+                    "   ✗ DIVERGED: SleepDisabled=\(st.sleepDisabled) but claims want \(wantLid)"))
         }
     }
 }

@@ -23,7 +23,8 @@ import UserNotifications
 
 let args = Array(CommandLine.arguments.dropFirst())
 let prime = args.first == "--prime"
-let message = prime
+let message =
+    prime
     ? "Sleep restored, a claim expired, the battery floor ended everything: it shows up here."
     : args.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 guard !message.isEmpty else {
@@ -37,7 +38,8 @@ guard !message.isEmpty else {
 enum Notifier {
     /// The daemon's log, appended: an LS-launched app has no stderr anyone reads.
     static func log(_ text: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/awake")
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
+            "Library/Logs/awake")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let line = "\(ISO8601DateFormatter().string(from: Date())) notifier: \(text)\n"
         let url = dir.appendingPathComponent("service.log")
@@ -73,26 +75,33 @@ enum Notifier {
                 // The one moment the system prompt appears. With --prime this is
                 // install time; otherwise it is the first real event, still "in
                 // context" (the banner that follows IS the reason).
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
+                    granted, error in
                     if let error {
                         log("authorization failed: \(error)")
                         exit(1)
                     }
                     guard granted else {
-                        log("notifications DENIED at the prompt. Re-enable: System Settings › Notifications › awake")
+                        log(
+                            "notifications DENIED at the prompt. Re-enable: System Settings › Notifications › awake"
+                        )
                         exit(2)
                     }
                     log("notifications authorized")
                     post(message)
                 }
             case .authorized, .provisional, .ephemeral:
-                if prime { exit(0) } // already answered; priming has nothing to say
+                if prime { exit(0) }  // already answered; priming has nothing to say
                 post(message)
             case .denied:
-                log("notifications denied for awake; message dropped: \(message). Re-enable: System Settings › Notifications › awake")
+                log(
+                    "notifications denied for awake; message dropped: \(message). Re-enable: System Settings › Notifications › awake"
+                )
                 exit(2)
             @unknown default:
-                log("unknown authorization status \(settings.authorizationStatus.rawValue); posting anyway")
+                log(
+                    "unknown authorization status \(settings.authorizationStatus.rawValue); posting anyway"
+                )
                 post(message)
             }
         }

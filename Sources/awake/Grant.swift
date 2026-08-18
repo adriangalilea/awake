@@ -30,15 +30,15 @@ enum Grant {
         }
 
         let script = """
-        set -e
-        tmp="$(mktemp)"
-        cat > "$tmp" <<'SUDOERS'
-        \(content)
-        SUDOERS
-        /usr/sbin/visudo -c -q -f "$tmp"
-        /usr/bin/install -m 440 -o root -g wheel "$tmp" \(Paths.sudoers)
-        rm -f "$tmp"
-        """
+            set -e
+            tmp="$(mktemp)"
+            cat > "$tmp" <<'SUDOERS'
+            \(content)
+            SUDOERS
+            /usr/sbin/visudo -c -q -f "$tmp"
+            /usr/bin/install -m 440 -o root -g wheel "$tmp" \(Paths.sudoers)
+            rm -f "$tmp"
+            """
         let scriptURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("awake-grant-\(getpid()).sh")
         try! script.write(to: scriptURL, atomically: true, encoding: .utf8)
@@ -57,14 +57,18 @@ enum Grant {
     /// One `do shell script ... with administrator privileges` — the native Touch ID
     /// or password sheet, no Terminal sudo.
     private static func adminShell(_ command: String) {
-        let escaped = command
+        let escaped =
+            command
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        let r = AwakeKit.run("/usr/bin/osascript",
-                             ["-e", "do shell script \"\(escaped)\" with administrator privileges"])
+        let r = AwakeKit.run(
+            "/usr/bin/osascript",
+            ["-e", "do shell script \"\(escaped)\" with administrator privileges"])
         if r.status != 0 {
             if r.err.contains("-128") { Client.die("cancelled") }
-            Client.die("privileged install failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))")
+            Client.die(
+                "privileged install failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
         }
     }
 }

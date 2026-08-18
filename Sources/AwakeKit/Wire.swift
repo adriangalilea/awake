@@ -28,8 +28,10 @@ public struct Reply: Codable, Sendable {
     public var coveredBy: Claim?
     public var ended: [Claim]?
 
-    public init(ok: Bool, error: String? = nil, status: Status, replaced: Claim? = nil,
-                coveredBy: Claim? = nil, ended: [Claim]? = nil) {
+    public init(
+        ok: Bool, error: String? = nil, status: Status, replaced: Claim? = nil,
+        coveredBy: Claim? = nil, ended: [Claim]? = nil
+    ) {
         self.ok = ok
         self.error = error
         self.status = status
@@ -48,7 +50,7 @@ public enum Wire {
     /// it into a DispatchSource and calls `acceptAndServe` on readability.
     public static func listen() -> Int32 {
         Paths.ensureStateDir()
-        unlink(Paths.socket.path) // stale socket from a dead daemon
+        unlink(Paths.socket.path)  // stale socket from a dead daemon
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         // preconditions, not asserts: a daemon that cannot listen must DIE loudly in
         // release (launchd restarts it, the log says why), never run deaf.
@@ -56,8 +58,9 @@ public enum Wire {
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let path = Paths.socket.path
-        precondition(path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path),
-                     "socket path too long: \(path)")
+        precondition(
+            path.utf8.count < MemoryLayout.size(ofValue: addr.sun_path),
+            "socket path too long: \(path)")
         withUnsafeMutableBytes(of: &addr.sun_path) { raw in
             raw.copyBytes(from: Array(path.utf8) + [0])
         }

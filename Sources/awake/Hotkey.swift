@@ -19,18 +19,22 @@ enum Hotkey {
         if spec == "--reset" {
             store.reset(.toggleSession)
             bounceDaemon()
-            print("hotkey reset to default: "
-                + store.combos(for: .toggleSession, .global).map(\.display).joined(separator: ", "))
+            print(
+                "hotkey reset to default: "
+                    + store.combos(for: .toggleSession, .global).map(\.display).joined(
+                        separator: ", "))
             return
         }
         guard let combo = parse(spec) else {
-            Client.die("can't parse '\(spec)' — grammar: [ctrl+][alt+][cmd+][shift+]<key>, e.g. ctrl+alt+cmd+a")
+            Client.die(
+                "can't parse '\(spec)' — grammar: [ctrl+][alt+][cmd+][shift+]<key>, e.g. ctrl+alt+cmd+a"
+            )
         }
         for old in store.combos(for: .toggleSession, .global) {
             store.remove(old, plane: .global, from: .toggleSession)
         }
         if let rejection = store.add(combo, plane: .global, to: .toggleSession) {
-            store.reset(.toggleSession) // never leave the action unbound on failure
+            store.reset(.toggleSession)  // never leave the action unbound on failure
             Client.die(rejection.message(for: combo))
         }
         bounceDaemon()
@@ -59,7 +63,8 @@ enum Hotkey {
     /// The daemon's Carbon registrations only rebuild in-process; a kickstart makes
     /// the new binding live now instead of at next login.
     private static func bounceDaemon() {
-        _ = AwakeKit.run("/bin/launchctl",
-                         ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
+        _ = AwakeKit.run(
+            "/bin/launchctl",
+            ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
     }
 }

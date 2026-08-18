@@ -5,13 +5,13 @@ import IOKit.pwr_mgt
 /// Why claims ended without being asked to. One reason per end event; the daemon
 /// composes the human message from (reason, ended claims, remaining claims).
 public enum EndReason: Sendable {
-    case requested            // CLI/menu said stop
-    case expired              // timed claim ran out
-    case pidExited(Int32)     // -w target is gone
-    case batteryFloor(Int)    // percent at trip time; always wins, ends everything
-    case lowPowerMode         // ends unforced claims only
-    case externalOff          // someone flipped the flag off under us; they win
-    case shutdown             // daemon quitting
+    case requested  // CLI/menu said stop
+    case expired  // timed claim ran out
+    case pidExited(Int32)  // -w target is gone
+    case batteryFloor(Int)  // percent at trip time; always wins, ends everything
+    case lowPowerMode  // ends unforced claims only
+    case externalOff  // someone flipped the flag off under us; they win
+    case shutdown  // daemon quitting
 
     /// Safety-net ends fire behind a closed lid where the screen informs nobody;
     /// these also go through the out-of-band notify hook.
@@ -119,7 +119,7 @@ public final class StateMachine {
             claims = [Claim(owner: "external", forced: false, modes: [.lid], term: .indefinite)]
             persist()
         } else {
-            persist() // clears a file that held only stale claims
+            persist()  // clears a file that held only stale claims
         }
         onChange?()
     }
@@ -141,7 +141,8 @@ public final class StateMachine {
     public func engage(_ claim: Claim) -> Result<Engaged, EngageError> {
         let power = Battery.snapshot()
         if power.discharging, config.batteryFloorPercent > 0,
-           power.percent <= config.batteryFloorPercent {
+            power.percent <= config.batteryFloorPercent
+        {
             // Don't arm what the floor immediately tears down.
             return .failure(.belowFloor(percent: power.percent, floor: config.batteryFloorPercent))
         }
@@ -153,9 +154,10 @@ public final class StateMachine {
         switch apply() {
         case .ok:
             persist()
-            log("engaged \(claim)"
-                + (replaced.map { " replacing \($0)" } ?? "")
-                + (coveredBy.map { " (covered by \($0))" } ?? ""))
+            log(
+                "engaged \(claim)"
+                    + (replaced.map { " replacing \($0)" } ?? "")
+                    + (coveredBy.map { " (covered by \($0))" } ?? ""))
             onChange?()
             return .success(Engaged(replaced: replaced, coveredBy: coveredBy, suspended: suspended))
         case .grantMissing:
@@ -179,7 +181,7 @@ public final class StateMachine {
         let remaining = claims.filter { !ids.contains($0.id) }
         notify?(reason, ended, remaining)
         claims = remaining
-        _ = apply() // teardown can't fail meaningfully; flag-off errors are logged in apply
+        _ = apply()  // teardown can't fail meaningfully; flag-off errors are logged in apply
         persist()
         log("ended (\(reason)) \(ended) (remaining \(remaining.count))")
         onChange?()
@@ -216,7 +218,7 @@ public final class StateMachine {
     }
 
     /// SIGTERM path: restore effect, KEEP intent on disk. launchd bounces the daemon
-    /// on every `make install` and on crashes; parking lets startup reconciliation
+    /// on every `mise run install` and on crashes; parking lets startup reconciliation
     /// re-arm the claims so an upgrade never silently eats them. Explicit quit and
     /// user-facing ends go through `end`, which clears. Reboots are guarded by
     /// `Claim.isValid`'s boot-time check, not by clearing here.
@@ -225,7 +227,7 @@ public final class StateMachine {
         let kept = claims
         claims = []
         _ = apply()
-        claims = kept // disk still holds them; only the effect was released
+        claims = kept  // disk still holds them; only the effect was released
         log("parked \(kept)")
     }
 
@@ -249,8 +251,10 @@ public final class StateMachine {
     public func setNotifyCommand(_ command: String) {
         config.notifyCommand = command.trimmingCharacters(in: .whitespaces)
         config.save()
-        log(config.notifyCommand.isEmpty ? "notify hook cleared"
-                                         : "notify hook set to \(config.notifyCommand)")
+        log(
+            config.notifyCommand.isEmpty
+                ? "notify hook cleared"
+                : "notify hook set to \(config.notifyCommand)")
     }
 
     public func setFloor(_ percent: Int) {
@@ -258,7 +262,7 @@ public final class StateMachine {
         config.batteryFloorPercent = clamped
         config.save()
         log("floor set to \(clamped)%")
-        tick() // a raised floor may immediately end the running claims
+        tick()  // a raised floor may immediately end the running claims
         onChange?()
     }
 
@@ -301,7 +305,8 @@ public final class StateMachine {
 
         for claim in claims {
             if case .whilePid(let pid, let started) = claim.term,
-               procStartTime(pid) != started {
+                procStartTime(pid) != started
+            {
                 end([claim.id], .pidExited(pid))
             }
         }
@@ -330,25 +335,33 @@ public final class StateMachine {
         guard config.batteryFloorPercent > 0 else { return }
         let power = Battery.snapshot()
         guard power.hasBattery, power.discharging,
-              power.percent <= config.batteryFloorPercent else { return }
+            power.percent <= config.batteryFloorPercent
+        else { return }
         guard CGDisplayIsAsleep(CGMainDisplayID()) != 0 else { return }
-        log("below floor (\(power.percent)% <= \(config.batteryFloorPercent)%), no claims, display dark, still awake: forcing sleep")
+        log(
+            "below floor (\(power.percent)% <= \(config.batteryFloorPercent)%), no claims, display dark, still awake: forcing sleep"
+        )
         onForcedSleep?(power.percent)
         let r = run("/usr/bin/pmset", ["sleepnow"])
-        if r.status != 0 { log("pmset sleepnow failed (\(r.status)): \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))") }
+        if r.status != 0 {
+            log(
+                "pmset sleepnow failed (\(r.status)): \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
+        }
     }
 
     public func status() -> Status {
         tick()
-        return Status(claims: claims.sorted { $0.startedAt < $1.startedAt },
-                      sleepDisabled: Kernel.sleepDisabled(),
-                      power: Battery.snapshot(),
-                      floor: config.batteryFloorPercent,
-                      notifyCommand: config.notifyCommand,
-                      keepDisplay: config.menuDisplay,
-                      suspendedSince: suspendedSince,
-                      updateCheck: config.updateCheck,
-                      latestVersion: config.latestVersion)
+        return Status(
+            claims: claims.sorted { $0.startedAt < $1.startedAt },
+            sleepDisabled: Kernel.sleepDisabled(),
+            power: Battery.snapshot(),
+            floor: config.batteryFloorPercent,
+            notifyCommand: config.notifyCommand,
+            keepDisplay: config.menuDisplay,
+            suspendedSince: suspendedSince,
+            updateCheck: config.updateCheck,
+            latestVersion: config.latestVersion)
     }
 
     // MARK: - Update check (the active-install ping, and the human's upgrade nudge)
@@ -375,7 +388,9 @@ public final class StateMachine {
                 announce = latest
             }
             config.save()
-            log("update check: latest \(latest), running \(running)\(announce != nil ? ", announcing" : "")")
+            log(
+                "update check: latest \(latest), running \(running)\(announce != nil ? ", announcing" : "")"
+            )
             return announce
         }
         config.nextUpdateCheck = Date().addingTimeInterval(3600)
@@ -392,7 +407,9 @@ public final class StateMachine {
     private func apply() -> LidResult {
         // Suspended: intent stands, effect is nothing. Same choke point, so the
         // delta logic below releases exactly what is held, and nothing else changes.
-        let wanted = suspended ? Set<Mode>()
+        let wanted =
+            suspended
+            ? Set<Mode>()
             : claims.reduce(into: Set<Mode>()) { $0.formUnion($1.modes) }
 
         // Assertions: held by this process, delta is trivial.

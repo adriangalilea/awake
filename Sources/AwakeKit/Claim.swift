@@ -3,8 +3,8 @@ import Foundation
 /// A wake mechanism. `.lid` is the kernel flag (needs the sudoers grant); the others
 /// are IOKit power assertions held by the daemon process.
 public enum Mode: String, Codable, CaseIterable, Sendable {
-    case lid      // pmset -a disablesleep 1 — survives lid close
-    case idle     // PreventUserIdleSystemSleep — no idle sleep while lid open
+    case lid  // pmset -a disablesleep 1 — survives lid close
+    case idle  // PreventUserIdleSystemSleep — no idle sleep while lid open
     case display  // PreventUserIdleDisplaySleep — screen stays on
 }
 
@@ -33,7 +33,8 @@ private func kinfo(_ pid: Int32) -> kinfo_proc? {
     var size = MemoryLayout<kinfo_proc>.size
     var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
     guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0,
-          info.kp_proc.p_pid == pid else { return nil }
+        info.kp_proc.p_pid == pid
+    else { return nil }
     return info
 }
 
@@ -66,13 +67,13 @@ private func procArgv0(_ pid: Int32) -> String? {
     guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 4 else { return nil }
     var buf = [UInt8](repeating: 0, count: size)
     guard sysctl(&mib, 3, &buf, &size, nil, 0) == 0, size > 4 else { return nil }
-    var i = 4 // skip argc
-    while i < size, buf[i] != 0 { i += 1 } // skip exec_path
-    while i < size, buf[i] == 0 { i += 1 } // skip its NUL padding
+    var i = 4  // skip argc
+    while i < size, buf[i] != 0 { i += 1 }  // skip exec_path
+    while i < size, buf[i] == 0 { i += 1 }  // skip its NUL padding
     let start = i
     while i < size, buf[i] != 0 { i += 1 }
     guard i > start else { return nil }
-    return String(decoding: buf[start ..< i], as: UTF8.self)
+    return String(decoding: buf[start..<i], as: UTF8.self)
 }
 
 /// One party's wish that the Mac stay awake. The machine is awake while ANY valid
@@ -92,13 +93,17 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
     public var term: Term
     public var startedAt: Date
 
-    public init(owner: String, forced: Bool, modes: Set<Mode>, term: Term,
-                startedAt: Date = Date()) {
+    public init(
+        owner: String, forced: Bool, modes: Set<Mode>, term: Term,
+        startedAt: Date = Date()
+    ) {
         self.id = UUID()
         // Owner strings reach osascript notifications; quotes would break the
         // quoting there and control characters have no business in a label.
-        self.owner = String(owner.map { $0 == "\"" ? "'" : $0 }
-            .filter { !$0.isNewline }).trimmingCharacters(in: .whitespaces)
+        self.owner = String(
+            owner.map { $0 == "\"" ? "'" : $0 }
+                .filter { !$0.isNewline }
+        ).trimmingCharacters(in: .whitespaces)
         self.forced = forced
         self.modes = modes
         self.term = term
@@ -196,8 +201,10 @@ public struct Config: Codable, Equatable, Sendable {
     public var latestVersion: String?
     public var updateAnnounced: String?
 
-    public init(batteryFloorPercent: Int = 15, lastMinutes: Int = 0, menuDisplay: Bool = false,
-                notifyCommand: String = "", updateCheck: Bool = true) {
+    public init(
+        batteryFloorPercent: Int = 15, lastMinutes: Int = 0, menuDisplay: Bool = false,
+        notifyCommand: String = "", updateCheck: Bool = true
+    ) {
         self.batteryFloorPercent = batteryFloorPercent
         self.lastMinutes = lastMinutes
         self.menuDisplay = menuDisplay
@@ -217,11 +224,12 @@ public struct Config: Codable, Equatable, Sendable {
         updateAnnounced = try c.decodeIfPresent(String.self, forKey: .updateAnnounced)
     }
 
-    public static let floorRange = 0 ... 50
+    public static let floorRange = 0...50
 
     public static func load() -> Config {
         guard let data = try? Data(contentsOf: Paths.configFile),
-              let c = try? JSONDecoder().decode(Config.self, from: data) else { return Config() }
+            let c = try? JSONDecoder().decode(Config.self, from: data)
+        else { return Config() }
         return c
     }
 
@@ -238,7 +246,9 @@ public enum ClaimStore {
         guard let claims = try? JSONDecoder().decode([Claim].self, from: data) else {
             // A file we can't decode is a schema change or corruption: scream and clear,
             // never limp along with unknown intent.
-            log("claims.json undecodable, clearing: \(String(data: data, encoding: .utf8) ?? "<binary>")")
+            log(
+                "claims.json undecodable, clearing: \(String(data: data, encoding: .utf8) ?? "<binary>")"
+            )
             clear()
             return []
         }
@@ -265,7 +275,8 @@ public enum ClaimStore {
 public enum SuspendStore {
     public static func load() -> Date? {
         guard let data = try? Data(contentsOf: Paths.suspendFile),
-              let since = try? JSONDecoder.iso.decode(Date.self, from: data) else { return nil }
+            let since = try? JSONDecoder.iso.decode(Date.self, from: data)
+        else { return nil }
         guard since >= bootTime() else {
             log("suspend switch predates this boot, clearing")
             save(nil)
@@ -285,19 +296,28 @@ public enum SuspendStore {
 }
 
 extension JSONDecoder {
-    static let iso: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
+    static let iso: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
 }
 
 extension JSONEncoder {
-    static let iso: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; return e }()
+    static let iso: JSONEncoder = {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        return e
+    }()
 }
 
 /// "0.4.0" > "0.3.10" by numeric components; a missing component is 0.
 public func versionIsNewer(_ a: String, than b: String) -> Bool {
     let pa = a.split(separator: ".").map { Int($0) ?? 0 }
     let pb = b.split(separator: ".").map { Int($0) ?? 0 }
-    for i in 0 ..< max(pa.count, pb.count) {
-        let x = i < pa.count ? pa[i] : 0, y = i < pb.count ? pb[i] : 0
+    for i in 0..<max(pa.count, pb.count) {
+        let x = i < pa.count ? pa[i] : 0
+        let y = i < pb.count ? pb[i] : 0
         if x != y { return x > y }
     }
     return false

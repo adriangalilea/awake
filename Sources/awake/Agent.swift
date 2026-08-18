@@ -2,9 +2,9 @@ import AwakeKit
 import Foundation
 
 /// The launchd agent, owned by the BINARY rather than by an installer, because
-/// there is more than one installer: `make install`, a Homebrew cask's postflight,
+/// there is more than one installer: `mise run install`, a Homebrew cask's postflight,
 /// and a human doing it by hand all have to land the same plist pointed at the
-/// same image. A copy of this logic in a Makefile is a copy that drifts.
+/// same image. A copy of this logic in an install script is a copy that drifts.
 enum Agent {
     static func run(_ args: [String]) {
         switch args.first {
@@ -28,8 +28,9 @@ enum Agent {
     static func install() {
         let fm = FileManager.default
         try? fm.createDirectory(at: Paths.logDir, withIntermediateDirectories: true)
-        try? fm.createDirectory(at: Paths.launchdPlist.deletingLastPathComponent(),
-                                withIntermediateDirectories: true)
+        try? fm.createDirectory(
+            at: Paths.launchdPlist.deletingLastPathComponent(),
+            withIntermediateDirectories: true)
         let log = Paths.logDir.appendingPathComponent("service.log").path
         do {
             try plist(bin: binaryPath, log: log)
@@ -40,7 +41,9 @@ enum Agent {
         stop()
         let r = AwakeKit.run("/bin/launchctl", ["bootstrap", domain, Paths.launchdPlist.path])
         guard r.status == 0 else {
-            Client.die("launchctl bootstrap failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))")
+            Client.die(
+                "launchctl bootstrap failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
         }
         print("✓ daemon bootstrapped (\(Paths.launchdLabel)) → \(binaryPath)")
         prime()
@@ -52,13 +55,19 @@ enum Agent {
     /// lid, prompt unseen, message lost) be the first ask. The notifier itself
     /// makes this a no-op once the person has answered, so re-installs never nag.
     private static func prime() {
-        let bundle = URL(fileURLWithPath: binaryPath).deletingLastPathComponent().deletingLastPathComponent()
+        let bundle = URL(fileURLWithPath: binaryPath).deletingLastPathComponent()
+            .deletingLastPathComponent()
         let notifier = bundle.appendingPathComponent("Helpers/awake-notifier.app")
-        guard FileManager.default.isExecutableFile(
-            atPath: notifier.appendingPathComponent("Contents/MacOS/awake-notifier").path) else { return }
-        let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", notifier.path, "--args", "--prime"])
+        guard
+            FileManager.default.isExecutableFile(
+                atPath: notifier.appendingPathComponent("Contents/MacOS/awake-notifier").path)
+        else { return }
+        let r = AwakeKit.run(
+            "/usr/bin/open", ["-g", "-n", "-a", notifier.path, "--args", "--prime"])
         if r.status != 0 {
-            print("⚠ notification prompt could not be launched: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))")
+            print(
+                "⚠ notification prompt could not be launched: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
+            )
         }
     }
 
@@ -74,7 +83,7 @@ enum Agent {
     /// come through here or it leaves yesterday's binary running.
     private static func stop() {
         _ = AwakeKit.run("/bin/launchctl", ["bootout", service])
-        for _ in 0 ..< 20 {
+        for _ in 0..<20 {
             if AwakeKit.run("/bin/launchctl", ["print", service]).status != 0 { return }
             usleep(500_000)
         }

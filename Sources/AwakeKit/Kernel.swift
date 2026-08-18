@@ -15,7 +15,8 @@ public func run(_ path: String, _ args: [String]) -> RunResult {
     p.arguments = args
     // No TTY, ever: a GUI daemon blocking on a prompt is an unrecoverable hang.
     p.standardInput = FileHandle.nullDevice
-    let outPipe = Pipe(), errPipe = Pipe()
+    let outPipe = Pipe()
+    let errPipe = Pipe()
     p.standardOutput = outPipe
     p.standardError = errPipe
     do { try p.run() } catch {
@@ -24,9 +25,10 @@ public func run(_ path: String, _ args: [String]) -> RunResult {
     let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
     let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
     p.waitUntilExit()
-    return RunResult(status: p.terminationStatus,
-                     out: String(data: outData, encoding: .utf8) ?? "",
-                     err: String(data: errData, encoding: .utf8) ?? "")
+    return RunResult(
+        status: p.terminationStatus,
+        out: String(data: outData, encoding: .utf8) ?? "",
+        err: String(data: errData, encoding: .utf8) ?? "")
 }
 
 /// Outcome of flipping the lid flag. Judged from sudo's REAL exit status and stderr,
@@ -51,17 +53,19 @@ public enum Kernel {
             precondition(tokens.count >= 2, "pmset -g SleepDisabled line shape changed: \(line)")
             return tokens.last == "1"
         }
-        return false // line absent = flag off (pre-toggle machines never show it)
+        return false  // line absent = flag off (pre-toggle machines never show it)
     }
 
     /// Flip the kernel flag through the scoped sudoers grant. `sudo -n` never prompts;
     /// the exact argument vector must match /etc/sudoers.d/awake.
     public static func setSleepDisabled(_ on: Bool) -> LidResult {
-        let r = run("/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", on ? "1" : "0"])
+        let r = run(
+            "/usr/bin/sudo", ["-n", "/usr/bin/pmset", "-a", "disablesleep", on ? "1" : "0"])
         if r.status == 0 { return .ok }
         let err = r.err.lowercased()
         if err.contains("a password is required") || err.contains("not allowed")
-            || err.contains("may not run") {
+            || err.contains("may not run")
+        {
             return .grantMissing
         }
         return .failed(r.err.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -77,9 +81,10 @@ public enum Kernel {
         case .lid: fatalError("lid is the pmset flag, not an assertion")
         }
         var id: IOPMAssertionID = 0
-        let rc = IOPMAssertionCreateWithName(type as CFString,
-                                             IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                             "awake" as CFString, &id)
+        let rc = IOPMAssertionCreateWithName(
+            type as CFString,
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            "awake" as CFString, &id)
         precondition(rc == kIOReturnSuccess, "IOPMAssertionCreateWithName(\(type)) rc=\(rc)")
         return id
     }
