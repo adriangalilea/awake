@@ -34,7 +34,7 @@ Or the dmg from [awake.untitled.garden](https://awake.untitled.garden), or from 
 
 ```
 git clone https://github.com/adriangalilea/awake
-cd awake && make install
+cd awake && mise run install     # needs mise (brew install mise); the verbs live in mise.toml
 awake grant
 ```
 
@@ -46,7 +46,7 @@ Either path installs the app, puts `awake` and `asleep` on your PATH, and bootst
 <you> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1
 ```
 
-That is the whole privilege footprint. `awake grant --remove` deletes it, `make uninstall` removes everything else.
+That is the whole privilege footprint. `awake grant --remove` deletes it, `mise run uninstall` removes everything else.
 
 ## How it actually works
 
@@ -95,14 +95,16 @@ style = "yellow"
 
 ## Development
 
+The verbs are mise tasks (`mise.toml`; `mise tasks` lists them):
+
 ```
-make check     # compile, the fast gate
-make install   # build + install + restart the daemon
-make notes     # draft notes/<version>.md from the commits
-make release   # signed, notarized, stapled dmg → tag → GitHub Release → garden → cask
+mise check           # format + compile, the fast gate
+mise run install     # build + install + restart the daemon
+mise notes           # draft notes/<version>.md from the commits
+mise run release     # signed, notarized, stapled dmg → tag → GitHub Release → garden → cask
 ```
 
-Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect notary key, neither of which belongs in CI, so CI only runs `make check`. Both live in the keychain, nothing on disk and nothing in this repo. Set the notary profile up once:
+Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect notary key, neither of which belongs in CI, so CI only runs `mise check`. Both live in the keychain, nothing on disk and nothing in this repo. Set the notary profile up once:
 
 ```
 xcrun notarytool store-credentials awake \

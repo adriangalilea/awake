@@ -3,8 +3,8 @@
 # parses to zero groups and renders as a dated heading with nothing underneath.
 # The group NAMES below are the soft half: Added/Fixed/Changed/Performance/
 # Polish earn a designed glyph and colour, anything else still renders plainly.
-# git-cliff drafts into the shape (`make notes`), a human rewrites the items,
-# and `make release` refuses anything that lost it.
+# git-cliff drafts into the shape (`mise notes`), a human rewrites the items,
+# and `mise run release` refuses anything that lost it.
 [changelog]
 header = ""
 body = """

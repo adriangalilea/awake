@@ -1,18 +1,203 @@
-# awake tasks (run from apps/awake): mise run check | build | install
-# Build logic lives in the Makefile; these are thin mise wrappers.
+# awake — one state machine for keep-awake, menu bar + CLI. The verbs
+# (`mise <task>` from the repo root):
+#   build      the binary (release)
+#   check      format + compile everything, debug — the FAST typecheck (0 warnings)
+#   install    build + install binary, asleep symlink, launchd agent; restart daemon
+#   uninstall  remove binary, symlink, launchd agent (sudoers grant: `awake grant --remove`)
+#   clean      remove the build directory
+#   notes      draft notes/$VERSION.md from the commits (you then rewrite it)
+#   release    signed, notarized, stapled dmg → tag → GitHub Release → cask
+#   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden (release does this)
+#   cask       bump the Homebrew cask to the built dmg (release does this)
+#   icon       redraw Resources/awake.icns + icon.png from scripts/make-icon.swift
+# Every compiling task runs under scripts/locked.sh (the build mutex);
+# scripts/assemble.sh builds the .app for install AND release, one implementation.
+
+[env]
+# THE VERSION, single source of truth: it stamps Info.plist and names the tag.
+# A mac app has a native version field, so the manifest is truth here and the
+# tag is derived from it (the inverse of a Swift library, where the tag IS the
+# version because SwiftPM has no manifest field).
+VERSION = "0.4.0"
+LABEL = "garden.untitled.awake"
+# The .app lives in ~/Applications; the CLI is a symlink into the bundle so
+# daemon and CLI stay ONE binary.
+APP = "{{ env.HOME }}/Applications/awake.app"
+APPBIN = "{{ env.HOME }}/Applications/awake.app/Contents/MacOS/awake"
+DIST = "dist"
 
 [tasks.build]
-description = "Build the awake binary"
-run = "make build"
+description = "Build the awake binary (release)"
+run = "scripts/locked.sh swift build -c release"
+
+[tasks.format]
+description = "swift-format in place (the Xcode toolchain's)"
+run = "xcrun swift-format --recursive Sources/ scripts/ --in-place"
+
+[tasks.lint]
+description = "swift-format lint, advisory (format-clean is the gate, not lint taste)"
+run = "xcrun swift-format lint --recursive Sources/ scripts/"
 
 [tasks.check]
-description = "Compile only — the 0-warning gate"
-run = "make check"
+description = "format + compile everything, debug — the FAST typecheck (must be 0 warnings)"
+run = '''
+mise run format
+scripts/locked.sh swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
+'''
+
+[tasks.icon]
+description = "Redraw Resources/awake.icns + icon.png from scripts/make-icon.swift (the web surface wants the flat PNG too)"
+sources = ["scripts/make-icon.swift"]
+outputs = ["Resources/awake.icns", "Resources/icon.png"]
+run = "swift scripts/make-icon.swift"
 
 [tasks.install]
-description = "Build and install binary + launchd daemon"
-run = "make install"
+description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the Claude skill, the launchd agent"
+depends = ["icon"]
+run = '''
+mise run build
+prefix="${PREFIX:-$HOME/.local}"
+mkdir -p "$prefix/bin" "$HOME/Library/Logs/awake"
+scripts/assemble.sh "$APP"
+# Developer ID gives a STABLE identity — TCC ties notification permission to the
+# signature, and ad-hoc identities churn every rebuild (UNErrorDomain Code=1).
+# Discovered, never hardcoded, so a fork signs with its own certificate; falls
+# back to ad-hoc on machines without the cert.
+# Inner first, then outer: a nested app must carry its own signature before the
+# enclosing bundle is sealed over it. Notification permission is tied to the
+# NOTIFIER's identity, so a stable Developer ID matters most on that one.
+sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
+codesign --force --sign "${sign_id:--}" "$APP/Contents/Helpers/awake-notifier.app"
+codesign --force --sign "${sign_id:--}" "$APP"
+# CLI = symlinks into the bundle: Bundle.main resolves through them, so the CLI
+# shares the daemon's defaults domain (hotkey remaps land where the daemon reads).
+ln -sf "$APPBIN" "$prefix/bin/awake"
+ln -sf "$APPBIN" "$prefix/bin/asleep"
+# The Claude skill ships with the app (_core skills convention: symlinked dir,
+# editing the repo updates the live skill).
+mkdir -p "$HOME/.claude/skills"
+ln -sfn "$PWD/skill" "$HOME/.claude/skills/awake"
+echo "installed $APP (+ awake, asleep symlinks, claude skill)"
+# The binary owns the launchd agent, not this file: a cask's postflight installs
+# it the same way, and one implementation cannot drift from itself.
+"$APPBIN" agent install
+'''
+
+[tasks.uninstall]
+description = "Remove app, symlinks, launchd agent (sudoers grant: awake grant --remove)"
+run = '''
+prefix="${PREFIX:-$HOME/.local}"
+if [ -x "$APPBIN" ]; then "$APPBIN" agent uninstall
+else launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true; fi
+rm -rf "$APP"
+rm -f "$HOME/Library/LaunchAgents/$LABEL.plist" "$prefix/bin/awake" "$prefix/bin/asleep"
+echo "removed app, symlinks, launchd agent. Sudoers grant: sudo rm /etc/sudoers.d/awake"
+'''
 
 [tasks.clean]
-description = "Remove the built binaries"
-run = "make clean"
+run = 'rm -rf .build "$DIST"'
+
+# THE WORDS GATE: a release exists only once a human has written what changed.
+# git-cliff DRAFTS from the commits; the draft is raw material, not prose users
+# read. Rewrite it, commit it, and that file is the release notes forever.
+[tasks.notes]
+description = "Draft notes/$VERSION.md from the commits with git-cliff (then REWRITE it for humans)"
+run = '''
+command -v git-cliff >/dev/null || { echo "git-cliff missing: brew install git-cliff"; exit 1; }
+notes="notes/$VERSION.md"
+test ! -f "$notes" || { echo "$notes exists already — edit it"; exit 1; }
+mkdir -p notes
+git-cliff --config .github/cliff.toml --unreleased --tag "$VERSION" -o "$notes"
+echo "drafted $notes — REWRITE it for humans, then commit it"
+'''
+
+# Notarization is a credentialed act, so releasing is a LOCAL command: the
+# certificate is in this keychain and the notary key is in ~/.appstoreconnect,
+# neither of which belongs in CI. CI's job is the 0-warning gate, nothing more.
+# A keychain profile, so no notary identifier and no key path exists in this
+# repo or in any file. Create it once:
+#   xcrun notarytool store-credentials awake \
+#     --key ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 \
+#     --key-id <KEYID> --issuer <ISSUER-UUID>
+[tasks.release]
+description = "Signed, notarized, stapled dmg → tag → GitHub Release → publish → cask (LOCAL: needs the Developer ID + notary profile)"
+depends = ["icon"]
+run = '''
+mise run check
+mise run build
+notes="notes/$VERSION.md"
+dmg="$DIST/awake-$VERSION.dmg"
+release_app="$DIST/awake.app"
+notary="${NOTARY_PROFILE:-awake}"
+test -z "$(git status --porcelain)" || { echo "working tree is dirty"; exit 1; }
+! git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null || { echo "tag $VERSION exists — bump VERSION in mise.toml"; exit 1; }
+test -f "$notes" || { echo "no $notes — run 'mise notes', then write it"; exit 1; }
+# The grammar, checked HERE rather than by whoever renders it later: notes
+# publish as DESIGNED releases (a glyph per group), so a body without groups
+# and items renders as a dated heading with nothing underneath.
+grep -q '^### ' "$notes" && grep -q '^- ' "$notes" || \
+  { echo "$notes needs '### Added|Fixed|Changed|Performance|Polish' sections with '- ' items"; exit 1; }
+sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
+test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain"; exit 1; }
+xcrun notarytool history --keychain-profile "$notary" >/dev/null 2>&1 || \
+  { echo "no notary keychain profile '$notary' — see the header of mise.toml"; exit 1; }
+rm -rf "$DIST" && mkdir -p "$DIST/stage"
+scripts/assemble.sh "$release_app"
+# Hardened runtime + secure timestamp: notarization rejects anything less.
+codesign --force --options runtime --timestamp --sign "$sign_id" "$release_app/Contents/Helpers/awake-notifier.app"
+codesign --force --options runtime --timestamp --sign "$sign_id" "$release_app"
+ditto -c -k --keepParent "$release_app" "$DIST/awake.zip"
+xcrun notarytool submit "$DIST/awake.zip" --keychain-profile "$notary" --wait
+# The REAL verdict: stapling fails unless a ticket was actually issued, so
+# this is the check, not notarytool's exit status.
+xcrun stapler staple "$release_app"
+cp -R "$release_app" "$DIST/stage/" && ln -sf /Applications "$DIST/stage/Applications"
+hdiutil create -volname awake -srcfolder "$DIST/stage" -ov -format UDZO "$dmg" -quiet
+git tag -a "$VERSION" -m "$VERSION" && git push origin "$VERSION"
+gh release create "$VERSION" --title "$VERSION" --notes-file "$notes" "$dmg"
+mise run publish
+mise run cask
+echo "released $VERSION: $dmg"
+'''
+
+# The garden half of a release: the dmg behind the counted download URL, the
+# notes on the surface. Publish BEFORE the cask bump: the cask's URL is this
+# one, and brew fetches it the moment the tap updates. The untitled garden
+# monorepo's release tool is the ONE writer to the R2 bucket behind
+# <slug>.untitled.garden/releases/<file>, the download URL that is COUNTED
+# (garden KPI `download`), and `pnpm garden notes` syncs notes/<v>.md to the
+# surface's release rows. A fork without the checkout skips both and its
+# downloads simply go unmeasured. GARDEN overrides the checkout path.
+[tasks.publish]
+description = "dmg → R2 behind awake.untitled.garden/releases (the counted url) + notes → garden"
+run = '''
+dmg="$DIST/awake-$VERSION.dmg"
+garden="${GARDEN:-$HOME/Developer/untitled}"
+test -f "$dmg" || { echo "no $dmg — run 'mise release'"; exit 1; }
+if [ ! -d "$garden/tools/release" ]; then echo "no garden at $garden, skipping publish (downloads uncounted)"; exit 0; fi
+url=$(pnpm --dir "$garden/tools/release" exec tsx dmg.ts awake "$PWD/$dmg") && echo "published $url"
+cd "$garden" && pnpm --silent garden notes awake
+'''
+
+# The cask points at the release asset by URL + sha256, so it can only be bumped
+# once the dmg is public. The Homebrew tap holding the recipe is a separate repo
+# because Homebrew only discovers taps by the `homebrew-` name prefix, so it can
+# never live here; TAP overrides its path. A fork without the tap checked out
+# just skips it.
+[tasks.cask]
+description = "Bump the Homebrew cask (adriangalilea/homebrew-tap) to the built dmg"
+run = '''
+dmg="$DIST/awake-$VERSION.dmg"
+tap="${TAP:-$HOME/Developer/homebrew-tap}"
+test -f "$dmg" || { echo "no $dmg — run 'mise release'"; exit 1; }
+if [ ! -d "$tap/.git" ]; then echo "no tap at $tap, skipping cask bump"; exit 0; fi
+sha=$(shasum -a 256 "$dmg" | cut -d' ' -f1)
+sed -i '' \
+  -e "s|^  version .*|  version \"$VERSION\"|" \
+  -e "s|^  sha256 .*|  sha256 \"$sha\"|" \
+  "$tap/Casks/awake.rb"
+git -C "$tap" add Casks/awake.rb
+git -C "$tap" commit -q -m "awake $VERSION"
+git -C "$tap" push -q origin main
+echo "cask bumped to $VERSION ($sha)"
+'''

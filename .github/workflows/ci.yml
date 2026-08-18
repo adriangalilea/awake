@@ -1,5 +1,6 @@
 # The only thing CI does. Releasing needs a signing certificate and a notary
-# key, so it happens locally (`make release`); nothing here touches a secret.
+# key, so it happens locally (`mise run release`); nothing here touches a secret.
+# The gate: format-clean (swift-format changes nothing) + 0 warnings.
 name: ci
 
 on:
@@ -16,4 +17,6 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
-      - run: make check
+      - uses: jdx/mise-action@v3
+      - run: mise run check
+      - run: git diff --exit-code

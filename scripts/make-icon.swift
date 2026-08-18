@@ -40,7 +40,7 @@ NSGradient(starting: amber.withAlphaComponent(0.20), ending: NSColor.clear)!
     .draw(in: squircle, relativeCenterPosition: NSPoint(x: 0, y: -0.25))
 
 func glowStroke(_ path: NSBezierPath, color: NSColor, blur: CGFloat, passes: Int) {
-    for _ in 0 ..< passes {
+    for _ in 0..<passes {
         NSGraphicsContext.current?.saveGraphicsState()
         let s = NSShadow()
         s.shadowBlurRadius = blur
