@@ -18,7 +18,7 @@
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 LABEL = "garden.untitled.awake"
 # The .app lives in ~/Applications; the CLI is a symlink into the bundle so
 # daemon and CLI stay ONE binary.

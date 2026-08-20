@@ -41,6 +41,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Ticks the header + claim rows while the menu is open — NSMenu never redraws
     /// otherwise.
     private var menuTicker: Timer?
+    /// Verified-live at launch and re-probed while broken: false = the sudoers
+    /// grant is missing, the menu leads with the setup row, and any keep-awake
+    /// gesture raises the admin sheet instead of failing into a notification
+    /// nobody granted permission to show (the first-run dead-icon bug).
+    private var grantReady = true
+    private var grantInFlight = false
     private var keymapStore: KeymapStore<AwakeAction>!
     private var hotkeys: GlobalHotkeys<AwakeAction>!
 
@@ -128,6 +134,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             timeInterval: 60, target: self,
             selector: #selector(pollTick),
             userInfo: nil, repeats: true)
+        grantReady = Grant.works()
         render()
     }
 
@@ -402,6 +409,21 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
         let st = machine.status()
 
+        // Re-probe only while broken (covers a CLI `awake grant` under a live
+        // daemon); once ready, ready. The setup row IS the onboarding: no
+        // terminal, one click, the system's own admin sheet.
+        if !grantReady { grantReady = Grant.works() }
+        if !grantReady {
+            let setup = NSMenuItem(
+                title: "finish setup — allow lid-closed awake\u{2026}",
+                action: #selector(grantClicked), keyEquivalent: "")
+            setup.target = self
+            setup.toolTip =
+                "One-time admin approval. Installs a sudoers rule scoped to exactly two pmset commands, validated by visudo first."
+            menu.addItem(setup)
+            menu.addItem(.separator())
+        }
+
         let header = NSMenuItem(
             title: Self.headerTitle(st.claims, suspended: machine.suspended),
             action: nil, keyEquivalent: "")
@@ -564,9 +586,40 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         {
         case .success:
             machine.rememberDuration(minutes)
+        case .failure(.grantMissing):
+            // The gesture MEANT "keep it awake": onboard, then complete it.
+            offerGrant(retryMinutes: minutes)
         case .failure(let err):
             Daemon.screenNotify(err.message)
         }
+    }
+
+    /// The in-app grant flow: the same native admin sheet as `awake grant`,
+    /// off-main (osascript blocks until the user decides). Success retries the
+    /// gesture that triggered it; cancel is the user's answer and stays quiet.
+    private func offerGrant(retryMinutes: Int?) {
+        guard !grantInFlight else { return }
+        grantInFlight = true
+        Task.detached {
+            let outcome = Grant.installInteractively()
+            await MainActor.run {
+                let d = Daemon.shared!
+                d.grantInFlight = false
+                switch outcome {
+                case .installed:
+                    d.grantReady = true
+                    if let minutes = retryMinutes { d.engage(minutes: minutes) }
+                case .cancelled:
+                    break
+                case .failed(let e):
+                    Daemon.screenNotify("setup failed: \(e)")
+                }
+            }
+        }
+    }
+
+    @objc private func grantClicked() {
+        offerGrant(retryMinutes: nil)
     }
 
     @objc private func engageClicked(_ sender: NSMenuItem) {
