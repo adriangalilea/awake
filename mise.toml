@@ -30,6 +30,20 @@ DIST = "dist"
 description = "Build the awake binary (release)"
 run = "scripts/locked.sh swift build -c release"
 
+# The dev loop that COEXISTS with the cask install: the resident agent is
+# the cask's (brew upgrade owns it); iterating runs the DEBUG daemon in the
+# foreground against the real socket, with the agent stopped for exactly
+# that long and restored on exit (^C included). `mise run install` remains
+# the full local override for when the dev build should BE the install.
+[tasks.dev]
+description = "Foreground DEBUG daemon; stops the installed agent, restores it on exit"
+run = '''
+scripts/locked.sh swift build
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+trap 'launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist" 2>/dev/null || true' EXIT
+.build/debug/awake daemon
+'''
+
 [tasks.format]
 description = "swift-format in place (the Xcode toolchain's)"
 run = "xcrun swift-format --recursive Sources/ scripts/ --in-place"
