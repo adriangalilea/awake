@@ -166,7 +166,8 @@ xcrun notarytool submit "$DIST/awake.zip" --keychain-profile "$notary" --wait
 # this is the check, not notarytool's exit status.
 xcrun stapler staple "$release_app"
 cp -R "$release_app" "$DIST/stage/" && ln -sf /Applications "$DIST/stage/Applications"
-hdiutil create -volname awake -srcfolder "$DIST/stage" -ov -format UDZO "$dmg" -quiet
+rm -f "$dmg"
+diskutil image create from --format UDZO --volumeName awake "$DIST/stage" "$dmg"
 git tag -a "$VERSION" -m "$VERSION" && git push origin "$VERSION"
 gh release create "$VERSION" --title "$VERSION" --notes-file "$notes" "$dmg"
 mise run publish
