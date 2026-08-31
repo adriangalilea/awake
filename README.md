@@ -23,7 +23,7 @@ Intent is a set of **claims**: yours, an agent's process watch and a build's tim
 
 **Closing the lid stays yours.** Your own claims survive it; a named claim — any program: a cron job, a build, a coding agent — keeps the Mac awake lid-open only, and may *ask* for lid-closed survival (`--lid`). The cup grows a "?" and the menu leads with the ask; one click answers it, and the grant dies with the claim it answered. The cup itself tells you what closing the lid will do: outline = sleeping normally, filled = held awake but bag-safe, burning = it will keep running with the lid shut.
 
-Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle: with claims running it **suspends** (the Mac sleeps normally, nothing anyone wanted is forgotten, and a claim that arrives meanwhile waits too); suspended, it resumes everything and starts your claim at the checkmarked duration; with nothing running it starts yours. Ending claims for good is a separate, explicit act (`asleep`, "End all claims" in the menu), never a gesture that reads as reversible. Left-click for the menu.
+Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle **your claim and nothing else**: with yours running it ends it — lid disarms, named claims keep working; with none it starts yours at the checkmarked duration (which arms lid). Putting the whole machine to sleep is a separate, explicit act: "Let it sleep" in the menu (`awake suspend`) keeps every claim inert until Resume, and "End all claims" (`asleep`) is the nuke. Each roster row opens into its own controls: allow, dismiss or revoke a lid ask, end one stuck session or all of an owner's. Left-click for the menu.
 
 ## Install
 

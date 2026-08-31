@@ -38,9 +38,11 @@ let usage = """
     The ask shows as ? in the menu bar and leads the menu; grant it there or with
     `awake allow`. A grant dies with the claim it answered.
 
-    Global hotkey (default ⌃⌥⌘A) and right-click on the menu bar cup toggle: claims
-    running → suspend (sleep normally, nothing forgotten); suspended → resume and
-    start yours at the last menu-chosen duration; nothing running → start yours.
+    Global hotkey (default ⌃⌥⌘A) and right-click on the menu bar cup toggle YOUR
+    claim only: yours running → end it (lid disarms, named claims keep working);
+    none → start yours at the last menu-chosen duration; suspended → resume and
+    start yours. "Let it sleep" (everything inert) is the menu item / `awake
+    suspend`, an explicit act, never this gesture.
     Battery floor: at the floor every claim ends; if the Mac is still awake below it
     with the display dark (someone else's assertion), it is put to sleep.
     """

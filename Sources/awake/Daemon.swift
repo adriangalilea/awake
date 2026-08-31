@@ -480,19 +480,67 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             : st.claims.map { Client.describe($0) }.joined(separator: "\n")
         menu.addItem(header)
         // The roster: one line per OWNER — who wants the Mac awake, and until when.
-        // A single owner already fits in the header; a crowd gets the list. Pids
-        // live in the tooltip, not the row.
+        // Pids live in the tooltip, not the row. Every row carries the granular
+        // controls in a submenu: lid verbs at owner granularity (the ask groups per
+        // owner), ending at claim granularity (a single stuck session dies alone).
         let summaries = Client.summarize(st.claims)
-        if summaries.count > 1 {
-            for s in summaries {
-                let item = NSMenuItem(
-                    title: "   " + s.label,
-                    action: nil, keyEquivalent: "")
-                item.isEnabled = false
-                item.representedObject = s.owner
-                item.toolTip = s.detail
-                menu.addItem(item)
+        for s in summaries {
+            let item = NSMenuItem(
+                title: "   " + s.label,
+                action: nil, keyEquivalent: "")
+            item.representedObject = s.owner
+            item.toolTip = s.detail
+            let group = st.claims.filter { $0.owner == s.owner }
+            let sub = NSMenu()
+            let asking = group.filter { $0.wantsLid && !$0.lidGranted }
+            let granted = group.filter { $0.wantsLid && $0.lidGranted }
+            if !asking.isEmpty {
+                let allow = NSMenuItem(
+                    title: "Allow lid-closed survival",
+                    action: #selector(allowAskClicked(_:)), keyEquivalent: "")
+                allow.target = self
+                allow.representedObject = asking.map(\.id)
+                sub.addItem(allow)
+                let dismiss = NSMenuItem(
+                    title: "Dismiss ask",
+                    action: #selector(denyAskClicked(_:)), keyEquivalent: "")
+                dismiss.target = self
+                dismiss.representedObject = asking.map(\.id)
+                sub.addItem(dismiss)
             }
+            if !granted.isEmpty {
+                let revoke = NSMenuItem(
+                    title: "Revoke lid grant",
+                    action: #selector(denyAskClicked(_:)), keyEquivalent: "")
+                revoke.target = self
+                revoke.representedObject = granted.map(\.id)
+                sub.addItem(revoke)
+            }
+            if sub.items.isEmpty == false { sub.addItem(.separator()) }
+            if group.count > 1 {
+                let endAll = NSMenuItem(
+                    title: "End all (\(group.count))",
+                    action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
+                endAll.target = self
+                endAll.representedObject = group.map(\.id)
+                sub.addItem(endAll)
+                for c in group {
+                    let row = NSMenuItem(
+                        title: "End · \(Client.describe(c))",
+                        action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
+                    row.target = self
+                    row.representedObject = [c.id]
+                    sub.addItem(row)
+                }
+            } else if let c = group.first {
+                let end = NSMenuItem(
+                    title: "End", action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
+                end.target = self
+                end.representedObject = [c.id]
+                sub.addItem(end)
+            }
+            item.submenu = sub
+            menu.addItem(item)
         }
         if st.power.hasBattery {
             let battery = NSMenuItem(
@@ -543,19 +591,22 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(.separator())
         }
 
-        // The toggle gesture (right-click, ⌃⌥⌘A) lands on exactly one item, and that
-        // item wears the hotkey badge: "End all claims" while anything runs, else
-        // the duration it would start. Pressing the chord with the menu open does
-        // the same thing the global hotkey does — the badge is never a lie.
+        // The toggle gesture (right-click, ⌃⌥⌘A) lands on exactly one item, and
+        // that item wears the hotkey badge: "End your session" while you hold a
+        // claim, else the duration it would start. The toggle is YOURS ONLY —
+        // ending it disarms lid and leaves every named claim working. Pressing
+        // the chord with the menu open does the same thing the global hotkey
+        // does — the badge is never a lie.
         let toggleBadge = { (item: NSMenuItem) in
             item.keyEquivalent = "a"
             item.keyEquivalentModifierMask = [.control, .option, .command]
         }
 
         // Three shapes. Suspended: "Resume" wears the badge (the toggle lifts the
-        // switch and starts yours). Claims running: "Let it sleep" wears the badge
-        // (suspend, keep everyone's intent), "End all claims" beneath it is the
-        // explicit nuke. Nothing running: the duration the toggle would start.
+        // switch and starts yours). Your claim running: "End your session" wears
+        // it. Otherwise the duration the toggle would start. "Let it sleep" and
+        // "End all claims" are the machine-level verbs, explicit and unbadged.
+        let yourClaims = st.claims.filter { $0.owner == Claim.humanOwner }
         if machine.suspended {
             let resume = NSMenuItem(
                 title: "Resume" + (st.claims.isEmpty ? "" : " (\(st.claims.count) waiting)"),
@@ -565,18 +616,29 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(resume)
             menu.addItem(.separator())
         } else if !st.claims.isEmpty {
+            if !yourClaims.isEmpty {
+                let endYours = NSMenuItem(
+                    title: "End your session",
+                    action: #selector(endYoursClicked), keyEquivalent: "")
+                endYours.target = self
+                endYours.toolTip =
+                    "Ends only your claim (lid disarms); named claims keep working"
+                toggleBadge(endYours)
+                menu.addItem(endYours)
+            }
             let sleep = NSMenuItem(
                 title: "Let it sleep",
                 action: #selector(suspendClicked), keyEquivalent: "")
             sleep.target = self
             sleep.toolTip = "Sleep normally now; every claim is kept and comes back on Resume"
-            toggleBadge(sleep)
             menu.addItem(sleep)
-            let end = NSMenuItem(
-                title: st.claims.count > 1 ? "End all claims" : "End session",
-                action: #selector(endClicked), keyEquivalent: "")
-            end.target = self
-            menu.addItem(end)
+            if st.claims.count > yourClaims.count {
+                let end = NSMenuItem(
+                    title: st.claims.count > 1 ? "End all claims" : "End session",
+                    action: #selector(endClicked), keyEquivalent: "")
+                end.target = self
+                menu.addItem(end)
+            }
             menu.addItem(.separator())
         }
 
@@ -590,7 +652,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.target = self
             item.representedObject = minutes
             item.state = yours == minutes ? .on : .off
-            if st.claims.isEmpty, !machine.suspended, machine.config.lastMinutes == minutes {
+            if yourClaims.isEmpty, !machine.suspended, machine.config.lastMinutes == minutes {
                 toggleBadge(item)
             }
             menu.addItem(item)
@@ -637,20 +699,23 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Right-click and the global hotkey. Suspended → resume, and start YOUR claim
-    /// at the last menu-chosen duration (the gesture means "keep it awake", and it
-    /// is symmetric with the off gesture: everyone's intent comes back, yours is
-    /// added). Claims running → suspend: the Mac sleeps normally, nothing is
-    /// forgotten, a `/clear` in some agent tab cannot silently re-arm what you
-    /// switched off. Nothing running → start yours. Ending claims for good is the
-    /// explicit menu item / `asleep`, never a gesture that reads as reversible.
+    /// at the last menu-chosen duration. The toggle is YOUR claim and nothing
+    /// else: yours running → end it (lid disarms, named claims keep working —
+    /// consent made this safe, ending yours no longer destroys anyone's intent);
+    /// none → start yours, which arms lid and thereby answers a pending ask the
+    /// machine-level way. "Let it sleep" (suspend everything) and "End all
+    /// claims" are explicit menu items / CLI verbs, never this gesture.
     private func toggleSession() {
         if machine.suspended {
             machine.resume()
             engage(minutes: machine.config.lastMinutes)
-        } else if machine.claims.isEmpty {
+            return
+        }
+        let yours = machine.claims.filter { $0.owner == Claim.humanOwner }
+        if yours.isEmpty {
             engage(minutes: machine.config.lastMinutes)
         } else {
-            machine.suspend()
+            machine.end(Set(yours.map(\.id)), .requested)
         }
     }
 
@@ -711,6 +776,15 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func endClicked() { machine.endAll(.requested) }
+
+    @objc private func endYoursClicked() {
+        let yours = machine.claims.filter { $0.owner == Claim.humanOwner }
+        machine.end(Set(yours.map(\.id)), .requested)
+    }
+
+    @objc private func endClaimsClicked(_ sender: NSMenuItem) {
+        machine.end(Set(sender.representedObject as! [UUID]), .requested)
+    }
 
     @objc private func displayToggled() {
         machine.setMenuDisplay(!machine.config.menuDisplay)
