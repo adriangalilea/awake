@@ -89,13 +89,31 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
     /// True when engaged deliberately. Forced claims survive Low Power Mode;
     /// nothing survives the battery floor.
     public var forced: Bool
+    /// GRANTED effect only. `.lid` here means the kernel flag is this claim's to
+    /// hold — your own claims carry it freely; a NAMED claim (any programmatic
+    /// caller: a cron job, build, script, coding agent) engaging with `.lid` is
+    /// demoted by the state machine to `wantsLid`. Lid-closed survival is the
+    /// human's to grant, never a program's to take.
     public var modes: Set<Mode>
+    /// A recorded ask for `.lid`: pure data, never touches the kernel by itself.
+    /// Rendered as the "?" in the menu bar and the menu's lead item.
+    public var wantsLid: Bool
+    /// The human's standing answer to `wantsLid`, set only through the state
+    /// machine (menu click or `awake allow`). Dies with the claim — a grant is
+    /// never remembered past the work it was granted for.
+    public var lidGranted: Bool
     public var term: Term
     public var startedAt: Date
 
+    /// What this claim actually exerts: granted modes, plus `.lid` when the ask
+    /// was granted. The ONLY mode set `apply()` reads.
+    public var effectiveModes: Set<Mode> {
+        wantsLid && lidGranted ? modes.union([.lid]) : modes
+    }
+
     public init(
         owner: String, forced: Bool, modes: Set<Mode>, term: Term,
-        startedAt: Date = Date()
+        startedAt: Date = Date(), wantsLid: Bool = false
     ) {
         self.id = UUID()
         // Owner strings reach osascript notifications; quotes would break the
@@ -106,12 +124,32 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
         ).trimmingCharacters(in: .whitespaces)
         self.forced = forced
         self.modes = modes
+        self.wantsLid = wantsLid
+        self.lidGranted = false
         self.term = term
         self.startedAt = startedAt
     }
 
+    /// Tolerant on the two ask fields so claims persisted (or sent over the wire)
+    /// by a pre-ask binary survive the upgrade instead of being screamed away.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        owner = try c.decode(String.self, forKey: .owner)
+        forced = try c.decode(Bool.self, forKey: .forced)
+        modes = try c.decode(Set<Mode>.self, forKey: .modes)
+        wantsLid = try c.decodeIfPresent(Bool.self, forKey: .wantsLid) ?? false
+        lidGranted = try c.decodeIfPresent(Bool.self, forKey: .lidGranted) ?? false
+        term = try c.decode(Term.self, forKey: .term)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+    }
+
     public static let defaultModes: Set<Mode> = [.lid, .idle]
     public static let humanOwner = "you"
+    /// The machine's own adoption of a kernel flag it found already set (a human's
+    /// manual `pmset`, or an unclean death). Exempt from lid demotion: demoting it
+    /// would flip the flag off behind the human who set it.
+    public static let adoptedOwner = "external"
 
     /// Replace-key: engaging again with the same key REPLACES that claim instead of
     /// stacking a duplicate. One claim per watched pid; one per owner label otherwise
@@ -126,7 +164,7 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
     /// for at least as long. A pid watch covers nothing (the pid can outlive any
     /// deadline) and only an indefinite claim covers one.
     public func covers(_ other: Claim) -> Bool {
-        guard modes.isSuperset(of: other.modes) else { return false }
+        guard effectiveModes.isSuperset(of: other.effectiveModes) else { return false }
         switch (term, other.term) {
         case (.indefinite, _): return true
         case (.until(let mine), .until(let theirs)): return mine >= theirs
@@ -181,8 +219,9 @@ public struct Config: Codable, Equatable, Sendable {
     /// and the global hotkey re-use it; only menu/hotkey gestures teach it — a wire
     /// client arming a timed claim must never rewrite the human's muscle memory.
     public var lastMinutes: Int
-    /// Menu/hotkey engagements include the display mode when true. CLI claims opt in
-    /// per call with --display; a background agent's claim must never light the screen.
+    /// The standing "keep the display on": while ANY claim holds the machine awake,
+    /// the display is held too — applied globally at the choke point, whoever owns
+    /// the claims. `--display` remains the per-claim CLI opt-in when this is off.
     public var menuDisplay: Bool
     /// Out-of-band notification for the ends that fire while the lid is CLOSED,
     /// where a screen notification informs nobody. Any executable taking one

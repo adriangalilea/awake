@@ -11,6 +11,11 @@ public enum Command: Codable, Sendable {
     case setFloor(Int)
     case setNotifyCommand(String)
     case setKeepDisplay(Bool)
+    /// The human's answer to a lid ask: nil token = every pending ask, else an
+    /// owner-label prefix or watched pid. Allow grants; deny clears the want
+    /// (deny after a grant is revoke).
+    case allowLid(String?)
+    case denyLid(String?)
     /// The human's "let it sleep" switch: claims kept, effect off / back on.
     case suspend
     case resume

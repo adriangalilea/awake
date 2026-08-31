@@ -13,8 +13,9 @@ One state machine for keep-awake, lid closed included. A launchd daemon owns int
 awake                 # indefinite claim (lid + idle), owner "you"
 awake 2h | 90m | 45   # timed claim (bare number = minutes)
 awake --until 18:00   # until wall-clock time (tomorrow if past)
-awake -w PID          # while a process lives — THE form for jobs and agents
+awake -w PID          # while a process lives — THE form for jobs and agents (lid-open only)
 awake --label NAME .. # name a timed/indefinite claim (who wants this)
+awake --lid ...       # ASK for lid-closed survival; the human grants it (menu or `awake allow`)
 awake --display ...   # also keep the display on for this claim
 awake suspend         # HUMAN gesture: let it sleep, claims kept inert (= right-click / ⌃⌥⌘A)
 awake resume          # HUMAN gesture: lift it
@@ -28,6 +29,7 @@ awake updates [on|off] # daily version check (one GET a day; the human's setting
 ## Rules for agents
 
 - **Wrapping a long job**: start it, then `awake -w <pid>`. The claim names itself after the process, ends itself when the pid dies (matched on start time as well as pid so reuse cannot fool it), and coexists with every other claim. Never use a timed claim for a job of unknown length.
+- **Lid-closed survival is the human's to grant, never yours to take.** A named claim (yours, a cron job's, a build's) runs lid-open only; the state machine demotes any `.lid` it carries to an ask. If the work genuinely must survive the lid closing, add `--lid`: the menu bar shows a "?" and the human answers from the menu or with `awake allow`. A pending ask is NOT a failure — the claim is live, the machine just still sleeps on lid close until granted. NEVER run `awake allow` or `awake deny` yourself: those are the human's answer, and answering your own ask defeats the entire design.
 - **Arm without checking**: claims cannot clobber each other, so there is no status check before `awake -w` — the old check-then-act guard is exactly the race the claims engine removed. Re-arming the same pid replaces that pid's claim atomically.
 - **Name your timed claims**: `awake --label "release build" 2h`. An unlabeled claim reads as the human's ("you") in the menu bar and notifications; a labeled one tells the human who wants the Mac awake. `-w` claims name themselves.
 - **Never `asleep`/`awake off` (bare) programmatically**: it ends EVERY claim including the human's. End only your own: `awake off <label|pid>`. `-w` claims need no ending at all.
@@ -35,5 +37,5 @@ awake updates [on|off] # daily version check (one GET a day; the human's setting
 - **A covered claim is still a claim**: engaging under someone's indefinite claim replies "already covered" but the claim is added, and it takes over if the covering claim ends. That is correct; do not treat the covered reply as failure.
 - `caffeinate` does NOT survive lid close. If something died when the lid closed, this is almost always why, and the answer is `awake`, not more caffeinate.
 - Safety nets belong to the daemon, not to you: the battery floor (default 15%) always wins and ends everything, Low Power Mode ends unforced claims, and everything resets on reboot by design. If claims ended "mysteriously", `awake status` and `~/Library/Logs/awake/service.log` say which net fired.
-- Sleep restored is not the same as display on: the screen dimming during a claim is normal. `--display` is per-claim and explicit from the CLI; the menu's "Keep display on" preference applies only to the human's menu/hotkey claims, never to yours.
+- Sleep restored is not the same as display on: the screen dimming during a claim can be normal. The menu's "Keep display on" preference is global — when the human has it on, the display is held while ANY claim runs, yours included; `--display` is the per-claim opt-in for when it is off.
 - Keeping the lid-closed flag set needs one privileged grant. If a command reports the grant is missing, tell the user to run `awake grant` themselves; it opens a native authentication prompt and is not something to automate.

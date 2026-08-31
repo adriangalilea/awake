@@ -283,8 +283,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             machine.setNotifyCommand(c)
             return Reply(ok: true, status: machine.status())
         case .setKeepDisplay(let on):
-            setKeepDisplay(on)
+            machine.setMenuDisplay(on)
             return Reply(ok: true, status: machine.status())
+        case .allowLid(let token):
+            return resolveLidReply(token, granted: true)
+        case .denyLid(let token):
+            return resolveLidReply(token, granted: false)
         case .suspend:
             machine.suspend()
             return Reply(ok: true, status: machine.status())
@@ -294,6 +298,25 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .setUpdateCheck(let on):
             machine.setUpdateCheck(on)
             return Reply(ok: true, status: machine.status())
+        }
+    }
+
+    /// The human's answer to lid asks, from the shell. Allow targets unanswered
+    /// asks; deny targets every want, so deny-after-grant is revoke.
+    private func resolveLidReply(_ token: String?, granted: Bool) -> Reply {
+        let pool = machine.claims.filter { granted ? ($0.wantsLid && !$0.lidGranted) : $0.wantsLid }
+        let targets = token.map { Self.match($0, in: pool) } ?? pool
+        if targets.isEmpty {
+            return Reply(
+                ok: false,
+                error: token.map { "no lid ask matches '\($0)'" }
+                    ?? (granted ? "no pending lid asks" : "no lid asks to dismiss"),
+                status: machine.status())
+        }
+        switch machine.resolveLidWant(Set(targets.map(\.id)), granted: granted) {
+        case .success: return Reply(ok: true, status: machine.status())
+        case .failure(let err):
+            return Reply(ok: false, error: err.message, status: machine.status())
         }
     }
 
@@ -309,37 +332,55 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Menu bar
 
-    /// ONE symbol both states (cup.and.heat.waves.fill — mixing variants shifts the
-    /// menu bar): the steam IS the state. ON: cup in a subtle amber (alertness), steam
-    /// in the bar's ink, full strength. OFF: palette [cup at 0.6 ink, steam fully
-    /// clear] — steam gone, cup clearly translucent. Palette layer order verified by
-    /// rendering: [cup, steam]. Neither image is a template — dynamic colors in the
-    /// palettes re-resolve per menu-bar appearance at draw time.
-    private static let onGlyph: NSImage = {
-        // systemOrange full-on reads as a warning light; blending it 55/45 with the
-        // bar's ink keeps the amber a tint, not a signal flare. The dynamic provider
-        // re-blends per appearance — a plain blended() would bake the launch-time ink.
-        let amber = NSColor(name: nil) { _ in
-            NSColor.systemOrange.blended(withFraction: 0.45, of: .labelColor) ?? .systemOrange
-        }
-        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-            .applying(.init(paletteColors: [amber, .labelColor]))
-        let img = NSImage(
-            systemSymbolName: "cup.and.heat.waves.fill",
-            accessibilityDescription: "awake")?.withSymbolConfiguration(cfg)
-        precondition(img != nil, "SF Symbol cup.and.heat.waves.fill missing")
-        return img!
-    }()
+    /// ONE symbol, four states, two axes (palette layer order verified by
+    /// rendering: [cup, steam]; overlays compose onto the filled cup so every
+    /// held state shares one set of metrics and the bar never shifts):
+    ///   cup ink   = is anything holding the Mac awake (outline = no, filled = yes)
+    ///   steam     = the LID axis and nothing else. No steam: closing the lid
+    ///               sleeps it, bag-safe however many claims run. A "?" rising off
+    ///               the cup: a named claim asks for lid-closed survival, yours to
+    ///               answer. Burning (red-orange, heavy): lid armed — don't bag it.
+    /// Dynamic colors re-resolve per menu-bar appearance at draw time; the overlay
+    /// closure runs at draw time too, so composed glyphs stay appearance-correct.
+    private static let burn = NSColor(name: nil) { _ in
+        NSColor.systemRed.blended(withFraction: 0.35, of: .systemOrange) ?? .systemRed
+    }
 
-    private static let offGlyph: NSImage = {
-        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
-            .applying(.init(paletteColors: [.labelColor.withAlphaComponent(0.6), .clear]))
+    private static func glyph(
+        _ symbol: String, _ cup: NSColor, _ steam: NSColor, weight: NSFont.Weight = .regular
+    ) -> NSImage {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: weight)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [cup, steam]))
         let img = NSImage(
-            systemSymbolName: "cup.and.heat.waves.fill",
+            systemSymbolName: symbol,
             accessibilityDescription: "awake")?.withSymbolConfiguration(cfg)
-        precondition(img != nil, "SF Symbol cup.and.heat.waves.fill missing")
+        precondition(img != nil, "SF Symbol \(symbol) missing")
         return img!
-    }()
+    }
+
+    /// `mark` drawn where the heat waves live — above the cup body.
+    private static func steamMark(_ base: NSImage, _ symbol: String, _ color: NSColor) -> NSImage {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        let mark = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)!
+            .withSymbolConfiguration(cfg)!
+        let size = base.size
+        return NSImage(size: size, flipped: false) { _ in
+            base.draw(in: NSRect(origin: .zero, size: size))
+            let m = mark.size
+            mark.draw(
+                in: NSRect(
+                    origin: NSPoint(x: (size.width - m.width) / 2 - 1, y: size.height - m.height),
+                    size: m))
+            return true
+        }
+    }
+
+    private static let offGlyph = glyph(
+        "cup.and.heat.waves", .labelColor.withAlphaComponent(0.5), .clear)
+    private static let onGlyph = glyph("cup.and.heat.waves.fill", .systemOrange, .clear)
+    private static let askGlyph = steamMark(onGlyph, "questionmark", .labelColor)
+    private static let lidGlyph = glyph("cup.and.heat.waves.fill", burn, burn, weight: .heavy)
 
     private static func headerTitle(_ claims: [Claim], suspended: Bool) -> String {
         let summaries = Client.summarize(claims)
@@ -375,7 +416,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let claims = machine.claims
         // The glyph is EFFECT: suspended reads as off (the Mac does sleep normally);
         // the tooltip carries the intent that is waiting underneath.
-        button.image = claims.isEmpty || machine.suspended ? Self.offGlyph : Self.onGlyph
+        button.image =
+            claims.isEmpty || machine.suspended
+            ? Self.offGlyph
+            : machine.lidArmed
+                ? Self.lidGlyph
+                : machine.askPending ? Self.askGlyph : Self.onGlyph
         let roster = claims.map { Client.describe($0) }.joined(separator: "\n")
         button.toolTip =
             machine.suspended
@@ -457,6 +503,45 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(battery)
         }
         menu.addItem(.separator())
+
+        // The ask leads the menu, the same slot the setup row uses: a named claim
+        // wants lid-closed survival, the glyph says "?", answering is one click.
+        // The grant dies with the claim it answered; Ignore clears the ask (the
+        // claim keeps running lid-open).
+        let asks = st.claims.filter { $0.wantsLid && !$0.lidGranted }
+        if !machine.suspended, !asks.isEmpty {
+            // One ask row per OWNER, the roster's grammar: six sessions of one
+            // program are one question, answered together.
+            var owners: [String] = []
+            for c in asks where !owners.contains(c.owner) { owners.append(c.owner) }
+            for owner in owners {
+                let group = asks.filter { $0.owner == owner }
+                let head = NSMenuItem(
+                    title: "\(owner) asks: survive lid close"
+                        + (group.count > 1 ? " (\(group.count))" : ""),
+                    action: nil, keyEquivalent: "")
+                head.isEnabled = false
+                head.toolTip = group.map { Client.describe($0) }.joined(separator: "\n")
+                menu.addItem(head)
+                let allWhilePid = group.allSatisfy {
+                    if case .whilePid = $0.term { return true } else { return false }
+                }
+                let allow = NSMenuItem(
+                    title: allWhilePid
+                        ? (group.count > 1 ? "Allow while they run" : "Allow while it runs")
+                        : "Allow",
+                    action: #selector(allowAskClicked(_:)), keyEquivalent: "")
+                allow.target = self
+                allow.representedObject = group.map(\.id)
+                menu.addItem(allow)
+                let ignore = NSMenuItem(
+                    title: "Ignore", action: #selector(denyAskClicked(_:)), keyEquivalent: "")
+                ignore.target = self
+                ignore.representedObject = group.map(\.id)
+                menu.addItem(ignore)
+            }
+            menu.addItem(.separator())
+        }
 
         // The toggle gesture (right-click, ⌃⌥⌘A) lands on exactly one item, and that
         // item wears the hotkey badge: "End all claims" while anything runs, else
@@ -573,8 +658,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func resumeClicked() { machine.resume() }
 
     private func engage(minutes: Int) {
-        var modes = Claim.defaultModes
-        if machine.config.menuDisplay { modes.insert(.display) }
+        let modes = Claim.defaultModes
         let term: Term =
             minutes == 0
             ? .indefinite
@@ -629,20 +713,26 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func endClicked() { machine.endAll(.requested) }
 
     @objc private func displayToggled() {
-        setKeepDisplay(!machine.config.menuDisplay)
+        machine.setMenuDisplay(!machine.config.menuDisplay)
     }
 
-    /// The preference AND the running claims, together: flipping it while claims are
-    /// up has to add or drop the assertion now, not at the next engagement. It moves
-    /// the HUMAN's claims only — an agent's claim never lights the screen because a
-    /// menu checkbox says so. Menu and CLI both land here so they cannot diverge.
-    func setKeepDisplay(_ on: Bool) {
-        machine.setMenuDisplay(on)
-        for var claim in machine.claims where claim.owner == Claim.humanOwner {
-            if on { claim.modes.insert(.display) } else { claim.modes.remove(.display) }
-            if case .failure(let err) = machine.engage(claim) {
-                Daemon.screenNotify(err.message)
-            }
+    /// One click on the menu's ask row. A missing sudoers grant raises the same
+    /// in-app admin sheet as any keep-awake gesture; the ask stays in the menu, so
+    /// completing setup and clicking Allow again finishes the thought.
+    @objc private func allowAskClicked(_ sender: NSMenuItem) {
+        resolveAsk(sender, granted: true)
+    }
+
+    @objc private func denyAskClicked(_ sender: NSMenuItem) {
+        resolveAsk(sender, granted: false)
+    }
+
+    private func resolveAsk(_ sender: NSMenuItem, granted: Bool) {
+        let ids = sender.representedObject as! [UUID]
+        switch machine.resolveLidWant(Set(ids), granted: granted) {
+        case .success: break
+        case .failure(.grantMissing): offerGrant(retryMinutes: nil)
+        case .failure(let err): Daemon.screenNotify(err.message)
         }
     }
 

@@ -9,6 +9,8 @@ awake            # keep awake indefinitely
 awake 2h         # ...for two hours
 awake --until 23:30
 awake -w 4821    # ...while process 4821 lives (the claim names itself after it)
+awake --lid ...  # a named claim ASKS for lid-closed survival; you grant it
+awake allow      # grant a pending ask (also one click in the menu)
 awake --display  # keep the screen on too
 awake suspend    # let it sleep now; every claim is kept and comes back on resume
 awake resume     # lift that switch
@@ -18,6 +20,8 @@ awake status     # every claim, what's true right now (--json for scripts)
 ```
 
 Intent is a set of **claims**: yours, an agent's process watch and a build's timer coexist instead of replacing each other. The Mac stays awake while any claim lives, sleep restores when the last one ends, and the menu bar lists who is holding it awake and why.
+
+**Closing the lid stays yours.** Your own claims survive it; a named claim — any program: a cron job, a build, a coding agent — keeps the Mac awake lid-open only, and may *ask* for lid-closed survival (`--lid`). The cup grows a "?" and the menu leads with the ask; one click answers it, and the grant dies with the claim it answered. The cup itself tells you what closing the lid will do: outline = sleeping normally, filled = held awake but bag-safe, burning = it will keep running with the lid shut.
 
 Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle: with claims running it **suspends** (the Mac sleeps normally, nothing anyone wanted is forgotten, and a claim that arrives meanwhile waits too); suspended, it resumes everything and starts your claim at the checkmarked duration; with nothing running it starts yours. Ending claims for good is a separate, explicit act (`asleep`, "End all claims" in the menu), never a gesture that reads as reversible. Left-click for the menu.
 

@@ -25,16 +25,17 @@ enum Client {
     // MARK: - Commands
 
     static func engage(_ args: [String]) {
-        // The standing display preference belongs to menu/hotkey gestures; from the
-        // shell, --display is the only way a claim lights the screen. A background
-        // agent's claim inheriting a display assertion is how a lid-closed Mac
-        // burns its battery to the floor.
-        var modes = Claim.defaultModes
         var term = Term.indefinite
         var owner = Claim.humanOwner
         var rest = args
+        var display = false
         if let i = rest.firstIndex(of: "--display") {
-            modes.insert(.display)
+            display = true
+            rest.remove(at: i)
+        }
+        var wantsLid = false
+        if let i = rest.firstIndex(of: "--lid") {
+            wantsLid = true
             rest.remove(at: i)
         }
         if let i = rest.firstIndex(of: "--label") {
@@ -69,12 +70,26 @@ enum Client {
             guard case .indefinite = term else { die("-w/--until and a duration are exclusive") }
             term = .until(Date().addingTimeInterval(seconds))
         }
-        let reply = send(.engage(Claim(owner: owner, forced: true, modes: modes, term: term)))
+        // Your own gesture carries lid; anyone else's claim is idle-only and lid is
+        // an ASK (--lid), granted from the menu or `awake allow`. The daemon
+        // enforces the same rule; this split just keeps the CLI honest about it.
+        var modes: Set<Mode> = owner == Claim.humanOwner ? Claim.defaultModes : [.idle]
+        if display { modes.insert(.display) }
+        let reply = send(
+            .engage(Claim(owner: owner, forced: true, modes: modes, term: term, wantsLid: wantsLid))
+        )
         if !reply.ok { die(reply.error ?? "engage failed") }
         if let r = reply.replaced { print(dim("replaced own claim: \(describe(r))")) }
         if let c = reply.coveredBy {
             print(dim("already covered by \(describe(c)) · claim added, takes over if that ends"))
         }
+        render(reply.status)
+    }
+
+    /// `awake allow|deny [WHO]`: the human's answer to a lid ask, from the shell.
+    static func resolveLid(_ granted: Bool, _ token: String?) {
+        let reply = send(granted ? .allowLid(token) : .denyLid(token))
+        if !reply.ok { die(reply.error ?? (granted ? "allow failed" : "deny failed")) }
         render(reply.status)
     }
 
@@ -121,8 +136,9 @@ enum Client {
             "battery floor: \(reply.status.floor)%\(reply.status.floor == 0 ? " (disabled)" : "")")
     }
 
-    /// No argument shows, `on`/`off` sets. The standing preference for menu and
-    /// hotkey engagements; shell claims use the one-shot `--display` flag.
+    /// No argument shows, `on`/`off` sets. The standing preference: while anything
+    /// holds the machine awake, hold the display too. `--display` remains the
+    /// per-claim opt-in when the preference is off.
     static func keepDisplay(_ args: [String]) {
         let status: Status
         switch args.first {
@@ -133,8 +149,8 @@ enum Client {
         }
         print(
             status.keepDisplay
-                ? "display: kept on for menu/hotkey sessions (--display per CLI claim)"
-                : "display: allowed to sleep (--display for one claim)")
+                ? "display: kept on while anything holds the Mac awake"
+                : "display: allowed to sleep (--display opts one claim in)")
     }
 
     /// No argument shows, a path sets, `--clear` removes. Always through the daemon:
@@ -242,7 +258,7 @@ enum Client {
                 case .until(let d): how = "\(formatInterval(d.timeIntervalSinceNow)) left"
                 case .whilePid: how = "while it runs"
                 }
-                label = "\(owner) · \(how)\(c.modes.contains(.display) ? " · display on" : "")"
+                label = "\(owner) · \(how)\(marks(g[0]))"
             } else if g.allSatisfy({
                 if case .whilePid = $0.term { return true } else { return false }
             }) {
@@ -264,7 +280,16 @@ enum Client {
         case .until(let d): how = "\(formatInterval(d.timeIntervalSinceNow)) left"
         case .whilePid(let pid, _): how = "while it runs (pid \(pid))"
         }
-        return "\(c.owner) · \(how)\(c.modes.contains(.display) ? " · display on" : "")"
+        return "\(c.owner) · \(how)\(marks(c))"
+    }
+
+    /// The flares a claim line carries beyond owner + term, one vocabulary for
+    /// menu, CLI, logs and tooltips.
+    static func marks(_ c: Claim) -> String {
+        var out = ""
+        if c.modes.contains(.display) { out += " · display on" }
+        if c.wantsLid { out += c.lidGranted ? " · lid granted" : " · asks lid" }
+        return out
     }
 
     static func render(_ st: Status) {
@@ -309,7 +334,15 @@ enum Client {
         }
         // Intent and effect must agree; the daemon's tick heals divergence, so seeing
         // this line means something is actively wrong. Scream.
-        let wantLid = st.suspendedSince == nil && st.claims.contains { $0.modes.contains(.lid) }
+        if st.askPending {
+            print(
+                color("1;33", "   ? lid asked")
+                    + dim(
+                        " — grant lid-closed survival with `awake allow`, dismiss with `awake deny`"
+                    ))
+        }
+        let wantLid =
+            st.suspendedSince == nil && st.claims.contains { $0.effectiveModes.contains(.lid) }
         if wantLid != st.sleepDisabled {
             print(
                 color(

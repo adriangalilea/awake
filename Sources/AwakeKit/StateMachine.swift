@@ -48,9 +48,14 @@ public struct Status: Codable, Equatable, Sendable {
     public var floor: Int
     /// Empty when no out-of-band hook is configured.
     public var notifyCommand: String
-    /// The standing "keep the display on" preference for menu/hotkey engagements.
-    /// Distinct from a claim merely holding `.display`.
+    /// The standing "keep the display on" preference: while ANY claim holds the
+    /// machine awake, the display is held too. Distinct from a claim carrying
+    /// `.display` itself (the CLI's one-shot `--display`).
     public var keepDisplay: Bool
+    /// Mirrors of the machine's computed truths, so every client renders from the
+    /// same arithmetic instead of re-deriving it.
+    public var lidArmed: Bool
+    public var askPending: Bool
     /// The human's "let it sleep" switch (right-click, hotkey, `awake suspend`):
     /// every claim is kept but inert until resumed. nil = not suspended.
     public var suspendedSince: Date?
@@ -101,22 +106,28 @@ public final class StateMachine {
     /// an indefinite unforced claim instead of silently undoing someone's decision.
     private func reconcileStartup() {
         let persisted = ClaimStore.load()
-        claims = persisted.filter { $0.isValid() }
-        for dropped in persisted where !claims.contains(dropped) {
+        let valid = persisted.filter { $0.isValid() }
+        for dropped in persisted where !valid.contains(dropped) {
             log("startup: dropping stale claim \(dropped)")
         }
+        claims = valid.map { normalized($0) }
         if !claims.isEmpty {
             log("startup: re-arming \(claims.count) persisted claim(s)")
             let result = apply()
             if result != .ok {
                 log("startup: re-arm lid flip failed (\(result)), dropping lid mode")
-                for i in claims.indices { claims[i].modes.remove(.lid) }
+                for i in claims.indices {
+                    claims[i].modes.remove(.lid)
+                    claims[i].lidGranted = false
+                }
                 _ = apply()
             }
             persist()
         } else if Kernel.sleepDisabled() {
             log("startup: kernel flag on with no claims, adopting as indefinite")
-            claims = [Claim(owner: "external", forced: false, modes: [.lid], term: .indefinite)]
+            claims = [
+                Claim(owner: Claim.adoptedOwner, forced: false, modes: [.lid], term: .indefinite)
+            ]
             persist()
         } else {
             persist()  // clears a file that held only stale claims
@@ -138,7 +149,31 @@ public final class StateMachine {
         public let suspended: Bool
     }
 
+    /// ENFORCED IN THE MACHINE, not in callers: lid-closed survival is the
+    /// human's to grant. A named claim (any programmatic caller: a cron job,
+    /// build, script, coding agent) carrying `.lid` gets it demoted to a recorded
+    /// ask — whatever client sent it, and whatever binary persisted it before
+    /// this rule existed. The machine's own "external" adoption is exempt.
+    /// Idempotent by construction.
+    private func normalized(_ claim: Claim) -> Claim {
+        guard claim.owner != Claim.humanOwner, claim.owner != Claim.adoptedOwner,
+            claim.modes.contains(.lid)
+        else { return claim }
+        var c = claim
+        c.modes.remove(.lid)
+        c.wantsLid = true
+        return c
+    }
+
     public func engage(_ claim: Claim) -> Result<Engaged, EngageError> {
+        var claim = normalized(claim)
+        // A same-key refresh (a hook re-arming its process watch) keeps the
+        // human's grant: the answer was given to the WORK, not to one engage call.
+        if let prior = claims.first(where: { $0.key == claim.key }),
+            prior.lidGranted, claim.wantsLid
+        {
+            claim.lidGranted = true
+        }
         let power = Battery.snapshot()
         if power.discharging, config.batteryFloorPercent > 0,
             power.percent <= config.batteryFloorPercent
@@ -244,6 +279,56 @@ public final class StateMachine {
         guard on != config.menuDisplay else { return }
         config.menuDisplay = on
         config.save()
+        _ = apply()
+    }
+
+    /// Lid is ARMED when some claim's effective modes include it and the human's
+    /// suspend switch is up. The burning glyph, and the state that must be visible
+    /// before a lid ever closes.
+    public var lidArmed: Bool {
+        !suspended && claims.contains { $0.effectiveModes.contains(.lid) }
+    }
+
+    /// An unanswered ask with no lid in effect — the "?" glyph and the menu's lead
+    /// item. Computed, never stored: when a covering grant or your own session
+    /// ends, a standing want resurfaces here by itself.
+    public var askPending: Bool {
+        !lidArmed && claims.contains { $0.wantsLid && !$0.lidGranted }
+    }
+
+    /// The human's answer to a lid ask. Grant flips `lidGranted` on the wanting
+    /// claims; deny clears the want (and any grant — deny after grant is revoke).
+    /// Idempotent; the grant dies with the claim.
+    @discardableResult
+    public func resolveLidWant(_ ids: Set<UUID>, granted: Bool) -> Result<[Claim], EngageError> {
+        let before = claims
+        var touched: [Claim] = []
+        for i in claims.indices where ids.contains(claims[i].id) && claims[i].wantsLid {
+            if granted {
+                if claims[i].lidGranted { continue }
+                claims[i].lidGranted = true
+            } else {
+                claims[i].wantsLid = false
+                claims[i].lidGranted = false
+            }
+            touched.append(claims[i])
+        }
+        guard !touched.isEmpty else { return .success([]) }
+        switch apply() {
+        case .ok:
+            persist()
+            log("\(granted ? "granted lid to" : "denied lid for") \(touched)")
+            onChange?()
+            return .success(touched)
+        case .grantMissing:
+            claims = before
+            _ = apply()
+            return .failure(.grantMissing)
+        case .failed(let err):
+            claims = before
+            _ = apply()
+            return .failure(.lidFailed(err))
+        }
     }
 
     /// The out-of-band hook. Set through here, never by editing config.json by hand:
@@ -280,7 +365,10 @@ public final class StateMachine {
         guard !claims.isEmpty else {
             if flagOn {
                 log("tick: external writer turned the flag on, adopting")
-                claims = [Claim(owner: "external", forced: false, modes: [.lid], term: .indefinite)]
+                claims = [
+                    Claim(
+                        owner: Claim.adoptedOwner, forced: false, modes: [.lid], term: .indefinite)
+                ]
                 persist()
                 onChange?()
                 return
@@ -292,7 +380,7 @@ public final class StateMachine {
         // An external writer flipping the flag OFF wins over every claim that wanted
         // it: silently re-flipping it would fight a human at the terminal. Under
         // the suspend switch the flag is off because WE keep it off; nothing to read.
-        if !flagOn, !suspended, claims.contains(where: { $0.modes.contains(.lid) }) {
+        if !flagOn, !suspended, claims.contains(where: { $0.effectiveModes.contains(.lid) }) {
             endAll(.externalOff)
             return
         }
@@ -359,6 +447,8 @@ public final class StateMachine {
             floor: config.batteryFloorPercent,
             notifyCommand: config.notifyCommand,
             keepDisplay: config.menuDisplay,
+            lidArmed: lidArmed,
+            askPending: askPending,
             suspendedSince: suspendedSince,
             updateCheck: config.updateCheck,
             latestVersion: config.latestVersion)
@@ -407,10 +497,14 @@ public final class StateMachine {
     private func apply() -> LidResult {
         // Suspended: intent stands, effect is nothing. Same choke point, so the
         // delta logic below releases exactly what is held, and nothing else changes.
-        let wanted =
+        var wanted =
             suspended
             ? Set<Mode>()
-            : claims.reduce(into: Set<Mode>()) { $0.formUnion($1.modes) }
+            : claims.reduce(into: Set<Mode>()) { $0.formUnion($1.effectiveModes) }
+        // The standing "keep display on" preference rides ANY effect, whoever owns
+        // the claims — a checked box while the screen sleeps is a lie. Battery burn
+        // is the floor's job, not this toggle's.
+        if config.menuDisplay, !wanted.isEmpty { wanted.insert(.display) }
 
         // Assertions: held by this process, delta is trivial.
         for mode in [Mode.idle, .display] {

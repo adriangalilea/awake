@@ -11,16 +11,19 @@ let usage = """
       awake                 indefinite claim (lid + idle)
       awake 2h | 90m | 45   timed claim (bare number = minutes)
       awake --until HH:MM   until a wall-clock time (tomorrow if already past)
-      awake -w PID          while a process lives (agents, builds); named after it
+      awake -w PID          while a process lives (builds, agents, jobs); named after it
       awake --label NAME .. name the claim (who wants this; default "you", -w names itself)
+      awake --lid ...       ask for lid-closed survival (named claims; you grant it)
       awake --display ...   also keep the display on for this claim
+      awake allow [WHO]     grant a pending lid ask (all, or owner prefix / pid)
+      awake deny [WHO]      dismiss it — after a grant, this revokes
       awake suspend         let it sleep: every claim kept, effect off (= right-click / ⌃⌥⌘A)
       awake resume          lift the switch, claims take effect again
       asleep | awake off    END every claim, restore normal sleep
       awake off WHO         end matching claims only (owner prefix or pid)
       awake status [--json] all claims + effect + battery, honestly
       awake floor N         battery floor percent (0 disables)
-      awake display [on|off] standing "keep the screen on" for menu/hotkey sessions
+      awake display [on|off] keep the screen on while anything holds the Mac awake
       awake notify [CMD]    out-of-band hook for closed-lid ends (--clear removes)
       awake updates [on|off] the daily version check (one GET, counts as an active install)
       awake hotkey [COMBO]  show/remap the global toggle (--reset for default)
@@ -28,6 +31,12 @@ let usage = """
       awake grant --remove  remove it · --force reinstalls over an existing rule
       awake agent install   write + bootstrap the launchd agent for THIS binary
       awake agent uninstall stop it and remove the plist
+
+    Lid-closed survival is YOURS to grant. Your own claims (menu, hotkey, bare
+    `awake`) carry it; a named claim — any programmatic caller: a cron job, a
+    build, a script, a coding agent — runs lid-open only and may ASK with --lid.
+    The ask shows as ? in the menu bar and leads the menu; grant it there or with
+    `awake allow`. A grant dies with the claim it answered.
 
     Global hotkey (default ⌃⌥⌘A) and right-click on the menu bar cup toggle: claims
     running → suspend (sleep normally, nothing forgotten); suspended → resume and
@@ -65,6 +74,10 @@ case "floor":
     Client.setFloor(v)
 case "display":
     Client.keepDisplay(Array(args.dropFirst()))
+case "allow":
+    Client.resolveLid(true, args.count > 1 ? args[1] : nil)
+case "deny":
+    Client.resolveLid(false, args.count > 1 ? args[1] : nil)
 case "notify":
     Client.notifyHook(Array(args.dropFirst()))
 case "updates":
