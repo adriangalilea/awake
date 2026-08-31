@@ -102,6 +102,12 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
     /// machine (menu click or `awake allow`). Dies with the claim — a grant is
     /// never remembered past the work it was granted for.
     public var lidGranted: Bool
+    /// Out-of-band hook for THIS claim's end, any reason: the daemon runs it via
+    /// `/bin/sh -c` with the reason as `$1` (and `$AWAKE_END_REASON`). How a
+    /// fire-and-forget caller — a script, a cron job, an agent — learns its wish
+    /// stopped being honored. Empty = nobody to tell. Keep it quick: it runs
+    /// before a closing end lets the Mac sleep, same contract as `awake notify`.
+    public var onEnd: String
     public var term: Term
     public var startedAt: Date
 
@@ -113,7 +119,7 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
 
     public init(
         owner: String, forced: Bool, modes: Set<Mode>, term: Term,
-        startedAt: Date = Date(), wantsLid: Bool = false
+        startedAt: Date = Date(), wantsLid: Bool = false, onEnd: String = ""
     ) {
         self.id = UUID()
         // Owner strings reach osascript notifications; quotes would break the
@@ -126,6 +132,7 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
         self.modes = modes
         self.wantsLid = wantsLid
         self.lidGranted = false
+        self.onEnd = onEnd
         self.term = term
         self.startedAt = startedAt
     }
@@ -140,6 +147,7 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
         modes = try c.decode(Set<Mode>.self, forKey: .modes)
         wantsLid = try c.decodeIfPresent(Bool.self, forKey: .wantsLid) ?? false
         lidGranted = try c.decodeIfPresent(Bool.self, forKey: .lidGranted) ?? false
+        onEnd = try c.decodeIfPresent(String.self, forKey: .onEnd) ?? ""
         term = try c.decode(Term.self, forKey: .term)
         startedAt = try c.decode(Date.self, forKey: .startedAt)
     }
@@ -158,6 +166,17 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
     public var key: String {
         if case .whilePid(let pid, _) = term { return "pid:\(pid)" }
         return "owner:\(owner.lowercased())"
+    }
+
+    /// `awake off|allow|deny|check WHO`: the claims a token names — an owner-label
+    /// prefix or a watched pid. ONE matcher for every surface that takes a WHO.
+    public static func matching(_ token: String, in claims: [Claim]) -> [Claim] {
+        let t = token.lowercased()
+        return claims.filter { claim in
+            if claim.owner.lowercased().hasPrefix(t) { return true }
+            if case .whilePid(let pid, _) = claim.term, String(pid) == token { return true }
+            return false
+        }
     }
 
     /// Whether this claim makes `other` currently redundant: at least the same modes,

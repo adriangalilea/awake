@@ -17,6 +17,8 @@ awake resume     # lift that switch
 asleep           # END every claim, back to normal sleep
 awake off make   # end just the claims matching an owner name or pid
 awake status     # every claim, what's true right now (--json for scripts)
+awake check 4821 # is that wish honored right now? exit 0 in effect · 2 inert · 3 gone
+awake --on-end 'notify done' -w 4821   # be told when the claim ends, any reason
 ```
 
 Intent is a set of **claims**: yours, an agent's process watch and a build's timer coexist instead of replacing each other. The Mac stays awake while any claim lives, sleep restores when the last one ends, and the menu bar lists who is holding it awake and why.

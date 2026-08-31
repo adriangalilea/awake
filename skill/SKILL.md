@@ -17,6 +17,8 @@ awake -w PID          # while a process lives — THE form for jobs and agents (
 awake --label NAME .. # name a timed/indefinite claim (who wants this)
 awake --lid ...       # ASK for lid-closed survival; the human grants it (menu or `awake allow`)
 awake --display ...   # also keep the display on for this claim
+awake --on-end CMD .. # run CMD when this claim ends, ANY reason (sh -c, $1 = why)
+awake check WHO       # is the wish honored right now? exit 0 in effect · 2 inert · 3 gone
 awake suspend         # HUMAN gesture: let it sleep, claims kept inert
 awake resume          # HUMAN gesture: lift it
 asleep                # end EVERY claim, restore normal sleep (= awake off)
@@ -28,6 +30,7 @@ awake updates [on|off] # daily version check (one GET a day; the human's setting
 
 ## Rules for agents
 
+- **A claim is a wish, not a lock.** The human can stop honoring it at any moment (menu End, `awake off`, the battery floor, Low Power Mode, reboot) and owes you no notice. Your half of the contract: `awake check <pid|label>` before relying on it at a critical moment (exit 0 = in effect, 2 = kept but suspended, 3 = gone), and `--on-end CMD` at claim time if you need to KNOW when it ends — the daemon runs CMD with the reason as `$1` (`requested`, `expired`, `battery-floor:12`, ...). Never treat an ended claim as an error; re-arm if the work still needs it, or accept the human's answer.
 - **Wrapping a long job**: start it, then `awake -w <pid>`. The claim names itself after the process, ends itself when the pid dies (matched on start time as well as pid so reuse cannot fool it), and coexists with every other claim. Never use a timed claim for a job of unknown length.
 - **Lid-closed survival is the human's to grant, never yours to take.** A named claim (yours, a cron job's, a build's) runs lid-open only; the state machine demotes any `.lid` it carries to an ask. If the work genuinely must survive the lid closing, add `--lid`: the menu bar shows a "?" and the human answers from the menu or with `awake allow`. A pending ask is NOT a failure — the claim is live, the machine just still sleeps on lid close until granted. NEVER run `awake allow` or `awake deny` yourself: those are the human's answer, and answering your own ask defeats the entire design.
 - **Arm without checking**: claims cannot clobber each other, so there is no status check before `awake -w` — the old check-then-act guard is exactly the race the claims engine removed. Re-arming the same pid replaces that pid's claim atomically.

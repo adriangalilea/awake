@@ -15,6 +15,8 @@ let usage = """
       awake --label NAME .. name the claim (who wants this; default "you", -w names itself)
       awake --lid ...       ask for lid-closed survival (named claims; you grant it)
       awake --display ...   also keep the display on for this claim
+      awake --on-end CMD .. run CMD when this claim ends, any reason (sh -c, $1 = why)
+      awake check [WHO]     is the wish honored right now? exit 0 in effect · 2 inert · 3 gone
       awake allow [WHO]     grant a pending lid ask (all, or owner prefix / pid)
       awake deny [WHO]      dismiss it — after a grant, this revokes
       awake suspend         let it sleep: every claim kept, effect off (= right-click / ⌃⌥⌘A)
@@ -76,6 +78,8 @@ case "floor":
     Client.setFloor(v)
 case "display":
     Client.keepDisplay(Array(args.dropFirst()))
+case "check":
+    Client.check(args.count > 1 ? args[1] : nil)
 case "allow":
     Client.resolveLid(true, args.count > 1 ? args[1] : nil)
 case "deny":

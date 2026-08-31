@@ -9,10 +9,11 @@ public struct RunResult: Sendable {
     public let err: String
 }
 
-public func run(_ path: String, _ args: [String]) -> RunResult {
+public func run(_ path: String, _ args: [String], env: [String: String]? = nil) -> RunResult {
     let p = Process()
     p.executableURL = URL(fileURLWithPath: path)
     p.arguments = args
+    if let env { p.environment = env }
     // No TTY, ever: a GUI daemon blocking on a prompt is an unrecoverable hang.
     p.standardInput = FileHandle.nullDevice
     let outPipe = Pipe()

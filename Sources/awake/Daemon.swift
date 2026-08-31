@@ -258,7 +258,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .end(let token):
             let targets: [Claim]
             if let token {
-                targets = Self.match(token, in: machine.claims)
+                targets = Claim.matching(token, in: machine.claims)
                 if targets.isEmpty {
                     let have = machine.claims.map { Client.describe($0) }
                         .joined(separator: " · ")
@@ -305,7 +305,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// asks; deny targets every want, so deny-after-grant is revoke.
     private func resolveLidReply(_ token: String?, granted: Bool) -> Reply {
         let pool = machine.claims.filter { granted ? ($0.wantsLid && !$0.lidGranted) : $0.wantsLid }
-        let targets = token.map { Self.match($0, in: pool) } ?? pool
+        let targets = token.map { Claim.matching($0, in: pool) } ?? pool
         if targets.isEmpty {
             return Reply(
                 ok: false,
@@ -317,16 +317,6 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .success: return Reply(ok: true, status: machine.status())
         case .failure(let err):
             return Reply(ok: false, error: err.message, status: machine.status())
-        }
-    }
-
-    /// `awake off WHO`: an owner-label prefix or a watched pid, every claim it names.
-    private static func match(_ token: String, in claims: [Claim]) -> [Claim] {
-        let t = token.lowercased()
-        return claims.filter { claim in
-            if claim.owner.lowercased().hasPrefix(t) { return true }
-            if case .whilePid(let pid, _) = claim.term, String(pid) == token { return true }
-            return false
         }
     }
 
@@ -847,6 +837,17 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// configured notify hook — sent BEFORE the flag drops so the push leaves on an
     /// awake network stack.
     static func notify(_ reason: EndReason, ended: [Claim], remaining: [Claim]) {
+        // Per-claim hooks fire for EVERY reason — the caller asked to know, and
+        // "requested" (a human ending it) is exactly the case it cannot see
+        // otherwise. Synchronous like the global hook: a closing end must reach
+        // its caller before the machine is allowed to sleep.
+        for c in ended where !c.onEnd.isEmpty {
+            var env = ProcessInfo.processInfo.environment
+            env["AWAKE_END_REASON"] = reason.label
+            let r = AwakeKit.run(
+                "/bin/sh", ["-c", c.onEnd, "awake-on-end", reason.label], env: env)
+            if r.status != 0 { log("on-end hook (\(c.owner)) failed: \(r.err)") }
+        }
         guard let message = composeMessage(reason, ended: ended, remaining: remaining) else {
             return
         }

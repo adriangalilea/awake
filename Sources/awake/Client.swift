@@ -38,6 +38,14 @@ enum Client {
             wantsLid = true
             rest.remove(at: i)
         }
+        var onEnd = ""
+        if let i = rest.firstIndex(of: "--on-end") {
+            guard rest.count > i + 1, !rest[i + 1].isEmpty else {
+                die("usage: awake --on-end CMD ...")
+            }
+            onEnd = rest[i + 1]
+            rest.removeSubrange(i...i + 1)
+        }
         if let i = rest.firstIndex(of: "--label") {
             guard rest.count > i + 1, !rest[i + 1].isEmpty else {
                 die("usage: awake --label NAME ...")
@@ -76,14 +84,35 @@ enum Client {
         var modes: Set<Mode> = owner == Claim.humanOwner ? Claim.defaultModes : [.idle]
         if display { modes.insert(.display) }
         let reply = send(
-            .engage(Claim(owner: owner, forced: true, modes: modes, term: term, wantsLid: wantsLid))
-        )
+            .engage(
+                Claim(
+                    owner: owner, forced: true, modes: modes, term: term,
+                    wantsLid: wantsLid, onEnd: onEnd)))
         if !reply.ok { die(reply.error ?? "engage failed") }
         if let r = reply.replaced { print(dim("replaced own claim: \(describe(r))")) }
         if let c = reply.coveredBy {
             print(dim("already covered by \(describe(c)) · claim added, takes over if that ends"))
         }
         render(reply.status)
+    }
+
+    /// `awake check [WHO]`: the caller's half of the contract — a claim is a wish,
+    /// not a lock, and this is how a script asks whether its wish is being honored
+    /// RIGHT NOW. Exit 0 = in effect · 2 = kept but inert (suspended) · 3 = gone.
+    static func check(_ token: String?) {
+        let st = send(.status).status
+        let matches = token.map { Claim.matching($0, in: st.claims) } ?? st.claims
+        if matches.isEmpty {
+            print(token.map { "gone · no claim matches '\($0)'" } ?? "gone · no claims")
+            exit(3)
+        }
+        if st.suspendedSince != nil {
+            print("inert · suspended by you · \(matches.count) claim(s) kept")
+            exit(2)
+        }
+        print(
+            "in effect · " + matches.map { describe($0) }.joined(separator: " · ")
+                + (st.lidArmed ? " · lid armed" : " · sleeps on lid close"))
     }
 
     /// `awake allow|deny [WHO]`: the human's answer to a lid ask, from the shell.

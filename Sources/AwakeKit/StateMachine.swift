@@ -13,6 +13,19 @@ public enum EndReason: Sendable {
     case externalOff  // someone flipped the flag off under us; they win
     case shutdown  // daemon quitting
 
+    /// The word a per-claim on-end hook receives as its argument.
+    public var label: String {
+        switch self {
+        case .requested: return "requested"
+        case .expired: return "expired"
+        case .pidExited(let pid): return "pid-exited:\(pid)"
+        case .batteryFloor(let p): return "battery-floor:\(p)"
+        case .lowPowerMode: return "low-power-mode"
+        case .externalOff: return "external-off"
+        case .shutdown: return "shutdown"
+        }
+    }
+
     /// Safety-net ends fire behind a closed lid where the screen informs nobody;
     /// these also go through the out-of-band notify hook.
     public var outOfBand: Bool {
