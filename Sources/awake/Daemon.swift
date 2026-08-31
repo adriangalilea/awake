@@ -517,26 +517,39 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 sub.addItem(revoke)
             }
             if sub.items.isEmpty == false { sub.addItem(.separator()) }
+            // "End" ends the CLAIM, never the watched process — the title and
+            // tooltip must say so, or the row reads as a kill switch.
+            let claimTip =
+                "Ends only the keep-awake claim; the process keeps running and the Mac may idle-sleep under it"
             if group.count > 1 {
                 let endAll = NSMenuItem(
-                    title: "End all (\(group.count))",
+                    title: "End all claims (\(group.count))",
                     action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
                 endAll.target = self
                 endAll.representedObject = group.map(\.id)
+                endAll.toolTip = claimTip
                 sub.addItem(endAll)
                 for c in group {
+                    let how: String =
+                        switch c.term {
+                        case .whilePid(let pid, _): "pid \(pid)"
+                        case .until(let d): "\(Client.formatInterval(d.timeIntervalSinceNow)) left"
+                        case .indefinite: "indefinite"
+                        }
                     let row = NSMenuItem(
-                        title: "End · \(Client.describe(c))",
+                        title: "End claim · \(how)",
                         action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
                     row.target = self
                     row.representedObject = [c.id]
+                    row.toolTip = claimTip
                     sub.addItem(row)
                 }
             } else if let c = group.first {
                 let end = NSMenuItem(
-                    title: "End", action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
+                    title: "End claim", action: #selector(endClaimsClicked(_:)), keyEquivalent: "")
                 end.target = self
                 end.representedObject = [c.id]
+                end.toolTip = claimTip
                 sub.addItem(end)
             }
             item.submenu = sub
