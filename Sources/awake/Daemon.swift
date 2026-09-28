@@ -559,6 +559,12 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             battery.isEnabled = false
             menu.addItem(battery)
         }
+        if st.thermalCritical {
+            let heat = NSMenuItem(
+                title: "Critical heat · lid refused until it cools", action: nil, keyEquivalent: "")
+            heat.isEnabled = false
+            menu.addItem(heat)
+        }
         menu.addItem(.separator())
 
         // The ask leads the menu, the same slot the setup row uses: a named claim
