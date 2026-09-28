@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import Grant
 import IOKit.pwr_mgt
 
 /// Why claims ended without being asked to. One reason per end event; the daemon
@@ -76,6 +77,9 @@ public struct Status: Codable, Equatable, Sendable {
     public var askPending: Bool
     /// `ProcessInfo.thermalState == .critical`: lid claims are ended and refused.
     public var thermalCritical: Bool
+    /// The notifier's last recorded reach; nil = never recorded (no notifier).
+    /// Clients render `Notifications.standing(_:)` of it, nothing rawer.
+    public var notifications: NotificationReach?
     /// The human's "let it sleep" switch (right-click, hotkey, `awake suspend`):
     /// every claim is kept but inert until resumed. nil = not suspended.
     public var suspendedSince: Date?
@@ -499,6 +503,7 @@ public final class StateMachine {
             lidArmed: lidArmed,
             askPending: askPending,
             thermalCritical: Self.thermalCritical,
+            notifications: NotificationStore.load(),
             suspendedSince: suspendedSince,
             updateCheck: config.updateCheck,
             latestVersion: config.latestVersion)

@@ -1,6 +1,8 @@
 import AwakeKit
 import Foundation
 
+import enum Grant.Notifications  // scoped: Grant's own Claim would shadow AwakeKit's
+
 /// The CLI: a thin client over the daemon's socket. It never flips state itself.
 enum Client {
     static func die(_ message: String) -> Never {
@@ -350,6 +352,12 @@ enum Client {
         }
         if st.thermalCritical { env.append("critical heat, lid refused") }
         if !env.isEmpty { print(dim("   " + env.joined(separator: " · "))) }
+        let notifications = Notifications.standing(st.notifications)
+        if notifications.grade == .broken, let note = notifications.note {
+            print(
+                color("33", "   notifications off: ")
+                    + dim("\(note) System Settings › Notifications › awake, or the menu's row"))
+        }
         // The upgrade nudge, from the daemon's last feed read; the check itself
         // is one GET a day (awake updates off silences it).
         let running = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String

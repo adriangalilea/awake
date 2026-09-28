@@ -62,7 +62,7 @@ switch args.first {
 case "daemon":
     Daemon.main()  // never returns
 case "grant":
-    Grant.run(remove: args.contains("--remove"), force: args.contains("--force"))
+    Sudoers.run(remove: args.contains("--remove"), force: args.contains("--force"))
 case "agent":
     Agent.run(Array(args.dropFirst()))
 case "status":

@@ -12,20 +12,28 @@ let package = Package(
     ],
     dependencies: [
         // Keymap: the system-wide hotkey path (Carbon, permission-free).
-        .package(url: "https://github.com/adriangalilea/swift-utils", from: "0.1.2")
+        // Grant: the Standing vocabulary + the notification reach probe.
+        .package(url: "https://github.com/adriangalilea/swift-utils", from: "0.18.0")
     ],
     targets: [
-        // The engine. Knows the kernel flag, assertions, battery, sessions. Knows no UI.
-        .target(name: "AwakeKit"),
+        // The engine. Knows the kernel flag, assertions, battery, sessions. Knows no UI;
+        // Grant only for the NotificationReach value Status carries.
+        .target(name: "AwakeKit", dependencies: [
+            .product(name: "Grant", package: "swift-utils")
+        ]),
         // The single binary: `awake daemon` (menu bar + socket server, launchd-run),
         // `awake ...` / `asleep` (clients). Dispatch by argv[0] + subcommand.
         .executableTarget(name: "awake", dependencies: [
             "AwakeKit",
             .product(name: "Keymap", package: "swift-utils"),
+            .product(name: "Grant", package: "swift-utils"),
         ]),
         // The notification hop: a separate .app nested in the bundle, LS-launched per
         // message so UNUserNotificationCenter sees a user-context app, not a launchd
-        // agent. Knows nothing about awake; takes one string, posts it, exits.
-        .executableTarget(name: "awake-notifier"),
+        // agent. Takes one string, posts it, records the reach it saw, exits.
+        .executableTarget(name: "awake-notifier", dependencies: [
+            "AwakeKit",
+            .product(name: "Grant", package: "swift-utils"),
+        ]),
     ]
 )

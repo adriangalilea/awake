@@ -5,6 +5,8 @@ import IOKit.ps
 import Keymap
 import SwiftUI
 
+import enum Grant.Standing  // scoped: Grant's own Claim would shadow AwakeKit's
+
 /// The Keymap contract: one action, one spec. The global default follows the library's
 /// modifier doctrine — a deliberate heavy chord on the identity initial (⌃⌥⌘A).
 /// Remaps overlay via KeymapStore in UserDefaults; the spec IS the default.
@@ -73,7 +75,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         machine.onForcedSleep = { Daemon.notifyForcedSleep(percent: $0) }
 
         log(
-            "notifications: \(Self.notifierApp.map { "awake-notifier at \($0.path)" } ?? "log only (bare binary, no bundle)")"
+            "notifications: \(Notifier.app.map { "awake-notifier at \($0.path)" } ?? "log only (bare binary, no bundle)")"
         )
 
         keymapStore = KeymapStore<AwakeAction>()
@@ -140,7 +142,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Startup re-armed persisted claims before the hooks existed; the nets judge
         // them now, with notifications wired, not a poll interval later.
         machine.tick()
-        grantReady = Grant.works()
+        grantReady = Sudoers.works()
+        Notifier.launch(["--probe"])
         render()
     }
 
@@ -229,6 +232,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func menuTick() {
+        styleLeadRows()
         guard let header = menu.items.first, !machine.claims.isEmpty else { return }
         header.title = Self.headerTitle(machine.claims, suspended: machine.suspended)
         let summaries = Client.summarize(machine.claims)
@@ -454,17 +458,22 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Re-probe only while broken (covers a CLI `awake grant` under a live
         // daemon); once ready, ready. The setup row IS the onboarding: no
         // terminal, one click, the system's own admin sheet.
-        if !grantReady { grantReady = Grant.works() }
-        if !grantReady {
-            let setup = NSMenuItem(
-                title: "finish setup — allow lid-closed awake\u{2026}",
-                action: #selector(grantClicked), keyEquivalent: "")
-            setup.target = self
-            setup.toolTip =
-                "One-time admin approval. Installs a sudoers rule scoped to exactly two pmset commands, validated by visudo first."
-            menu.addItem(setup)
-            menu.addItem(.separator())
-        }
+        if !grantReady { grantReady = Sudoers.works() }
+        // The notifier re-reads its reach off-main (an LS launch); the row follows
+        // within a menu tick, so returning from System Settings clears it live.
+        DispatchQueue.global(qos: .userInitiated).async { Notifier.launch(["--probe"]) }
+        let sudoers = NSMenuItem(title: "", action: #selector(grantClicked), keyEquivalent: "")
+        sudoers.target = self
+        Self.style(sudoers, "Finish setup", sudoersStanding)
+        let notifications = NSMenuItem(
+            title: "", action: #selector(notificationsClicked), keyEquivalent: "")
+        notifications.target = self
+        let lead = NSMenuItem.separator()
+        leadRows = (sudoers, notifications, lead)
+        styleLeadRows()
+        menu.addItem(sudoers)
+        menu.addItem(notifications)
+        menu.addItem(lead)
 
         let header = NSMenuItem(
             title: Self.headerTitle(st.claims, suspended: machine.suspended),
@@ -765,7 +774,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard !grantInFlight else { return }
         grantInFlight = true
         Task.detached {
-            let outcome = Grant.installInteractively()
+            let outcome = Sudoers.installInteractively()
             await MainActor.run {
                 let d = Daemon.shared!
                 d.grantInFlight = false
@@ -784,6 +793,44 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func grantClicked() {
         offerGrant(retryMinutes: nil)
+    }
+
+    @objc private func notificationsClicked() {
+        NotifierGrant().act()
+    }
+
+    // MARK: - Grants (the rows that lead the menu)
+
+    /// The sudoers grant in swift-utils Grant's vocabulary: one click raises the
+    /// system's own admin sheet, so missing is an offer, never a failure.
+    private var sudoersStanding: Standing {
+        grantReady
+            ? .good
+            : .askable(
+                "Allow lid-closed awake\u{2026}",
+                note:
+                    "One-time admin approval. Installs a sudoers rule scoped to exactly two pmset commands, validated by visudo first."
+            )
+    }
+
+    /// The menu's grant rows, kept so the open-menu ticker can restyle them.
+    private var leadRows: (sudoers: NSMenuItem, notifications: NSMenuItem, separator: NSMenuItem)?
+
+    private func styleLeadRows() {
+        guard let rows = leadRows else { return }
+        let standing = NotifierGrant().standing
+        Self.style(
+            rows.notifications, standing.grade == .broken ? "Notifications off" : "Notifications",
+            standing)
+        rows.separator.isHidden = rows.sudoers.isHidden && rows.notifications.isHidden
+    }
+
+    /// A grant renders mechanically from its Standing: a row only when it needs the
+    /// human, the action title saying what the click does, the note as tooltip.
+    private static func style(_ item: NSMenuItem, _ title: String, _ standing: Standing) {
+        item.isHidden = !standing.grade.needsUser
+        item.title = "\(title) · \(standing.actionTitle)"
+        item.toolTip = standing.note
     }
 
     @objc private func engageClicked(_ sender: NSMenuItem) {
@@ -930,33 +977,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return c.owner == Claim.humanOwner ? "Your\(span) claim" : "\(c.owner)'s\(span) claim"
     }
 
-    /// The nested notifier app, present only when running from the assembled bundle
-    /// (scripts/assemble.sh puts it in Contents/Helpers). nil = bare .build binary in dev.
-    private static let notifierApp: URL? = {
-        guard Bundle.main.bundleIdentifier != nil else { return nil }
-        let url = Bundle.main.bundleURL.appendingPathComponent(
-            "Contents/Helpers/awake-notifier.app")
-        return FileManager.default.isExecutableFile(
-            atPath: url.appendingPathComponent("Contents/MacOS/awake-notifier").path) ? url : nil
-    }()
-
-    /// A banner on screen: the nested awake-notifier.app, launched by LaunchServices
-    /// per message (`open -g -n`: background, fresh instance every time so two ends in
-    /// one second are two banners). UNUserNotificationCenter is only reachable from an
-    /// LS-launched user-context app, never from this launchd agent (Apple DTS, forums
-    /// 804854; verified 2026-08 with a Developer ID signature, lsregister and an LS
-    /// launch: UNErrorDomain Code=1 every time). The bare development binary has no
-    /// bundle and no helper: the message goes to the log, and that is all it gets.
+    /// A banner on screen, through the notifier (see `Notifier`).
     static func screenNotify(_ message: String) {
-        guard let app = notifierApp else {
-            log("notify (no bundle, no helper): \(message)")
-            return
-        }
-        let r = AwakeKit.run("/usr/bin/open", ["-g", "-n", "-a", app.path, "--args", message])
-        if r.status != 0 {
-            log(
-                "awake-notifier launch failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
-            )
-        }
+        Notifier.launch([message])
     }
 }

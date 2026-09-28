@@ -4,7 +4,7 @@ import Foundation
 /// The privilege boundary, solofan's shape: one native auth sheet installs a sudoers
 /// drop-in scoped to exactly the two pmset invocations, validated by visudo BEFORE it
 /// lands (a broken sudoers file locks sudo for the whole machine).
-enum Grant {
+enum Sudoers {
     /// Pinned to the installing user, not %admin: exactly one principal gets the
     /// passwordless flip, the narrowest rule that works.
     static var content: String {

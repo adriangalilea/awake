@@ -1,4 +1,5 @@
 import Foundation
+import Grant
 
 /// A wake mechanism. `.lid` is the kernel flag (needs the sudoers grant); the others
 /// are IOKit power assertions held by the daemon process.
@@ -217,6 +218,11 @@ public enum Paths {
     /// absent whenever the switch is off, so claims.json keeps its shape.
     public static let suspendFile = stateDir.appendingPathComponent("suspended.json")
     public static let configFile = stateDir.appendingPathComponent("config.json")
+    /// The notifier's last reading of its own notification reach. Only the
+    /// notifier can read it (the daemon is a launchd agent); the daemon renders it.
+    public static let notificationsFile = stateDir.appendingPathComponent("notifications.json")
+    /// The notifications row in System Settings belongs to the app that posts.
+    public static let notifierBundleID = "garden.untitled.awake.notifier"
     public static let socket = stateDir.appendingPathComponent("awake.sock")
     public static let sudoers = "/etc/sudoers.d/awake"
     public static let launchdLabel = "garden.untitled.awake"
@@ -350,6 +356,20 @@ public enum SuspendStore {
         }
         Paths.ensureStateDir()
         try! JSONEncoder.iso.encode(since).write(to: Paths.suspendFile, options: .atomic)
+    }
+}
+
+/// Written by the notifier on every run, read by the daemon. nil = never recorded
+/// (a bare dev binary has no notifier), rendered as unknown.
+public enum NotificationStore {
+    public static func load() -> NotificationReach? {
+        guard let data = try? Data(contentsOf: Paths.notificationsFile) else { return nil }
+        return try! JSONDecoder().decode(NotificationReach.self, from: data)
+    }
+
+    public static func save(_ reach: NotificationReach) {
+        Paths.ensureStateDir()
+        try! JSONEncoder().encode(reach).write(to: Paths.notificationsFile, options: .atomic)
     }
 }
 
