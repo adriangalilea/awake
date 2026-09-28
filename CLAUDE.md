@@ -84,7 +84,6 @@ MIT, standalone repo, `swift-utils` consumed as a versioned URL dependency (`fro
 
 ## Deliberately not built (decided, not forgotten)
 
-- **Thermal guard** (end the session if the machine runs hot lid-closed): the failure it would prevent is already bounded twice — the battery floor caps how long a hot closed Mac can run unplugged, and the flag's reboot reset caps every runaway. Adding it would mean an SMC-reading root helper (the solofan helper is the precedent) for a third net that fires after the first two. If a real scorched-bag incident ever happens, that's the trigger to revisit; the hook is `tick()`, the data source is solofan's helper.
 - **Multi-user concerns** (per-user daemons fighting over the one kernel flag): the sudoers rule is pinned to the installing user, so on a single-user machine the question never arises. A second user could not flip the flag at all. If this ever ships publicly, the adopt/external-writer reconciliation already converges multiple writers, but the grant model would need rethinking (per-user rules mean any of them can disable sleep for all).
 
 ## Verification (runnable reality, no test suite)
