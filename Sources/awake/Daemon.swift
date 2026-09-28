@@ -84,6 +84,11 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case .toggleSession: self?.toggleSession()
             }
         }
+        // Carbon refuses a combo another app owns; Keymap only records it here.
+        log(
+            keymapStore.deadGlobals.isEmpty
+                ? "hotkey registered"
+                : "hotkey NOT registered, another app owns it: \(keymapStore.deadGlobals)")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         precondition(statusItem.button != nil, "no status bar button")
