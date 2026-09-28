@@ -65,6 +65,7 @@ Because a flag that outlives its owner is dangerous, a resident daemon guards it
 - **Effect** lives in the kernel. **Intent** lives in the daemon and is mirrored to disk, so a crashed daemon re-arms honestly instead of leaving your Mac permanently awake.
 - A **battery floor** (15% by default, `awake floor N`) always wins and ends every claim. And because ending claims only *lets* the Mac sleep, if it is still awake below the floor with the display dark, something else (audio on the speakers, a download) is holding an idle assertion, and awake puts the Mac to sleep itself rather than watch it drain from the floor to hibernation.
 - Low Power Mode ends claims nobody forced.
+- **Critical heat** ends every claim that holds the lid, forced or not, and refuses new ones until the Mac cools. A closed Mac in a bag can sit at critical thermal pressure for hours before macOS forces an emergency sleep; awake lets go the moment it gets there. Claims without the lid keep running, and nothing re-arms on its own.
 - `-w PID` matches the process start time as well as the pid, so a recycled pid can never keep a dead process's claim alive.
 - If you flip the flag by hand with `pmset`, awake adopts it as a claim rather than silently undoing you.
 
@@ -76,7 +77,7 @@ Once a day the daemon fetches `awake.untitled.garden/appcast.xml`. That GET is t
 
 ## Notifications
 
-Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Banners are real system notifications, posted by a tiny helper app inside the bundle (macOS refuses them to a launchd agent, which the daemon has to be); the one-time permission prompt comes at install, with a first banner that says what will arrive there. Two of those ends, the battery floor and Low Power Mode, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
+Claims that end on their own say so on screen when it matters: when sleep was actually restored, or when yours ended while others still hold the Mac awake. An agent's claim quietly handing off under yours is a non-event and stays out of your face. Banners are real system notifications, posted by a tiny helper app inside the bundle (macOS refuses them to a launchd agent, which the daemon has to be); the one-time permission prompt comes at install, with a first banner that says what will arrive there. Three of those ends, the battery floor, Low Power Mode and critical heat, are exactly the ones that fire while the lid is shut, where a screen notification informs nobody. So you can point awake at any executable and it will be called with a single message argument:
 
 ```
 awake notify ~/.local/bin/push-to-my-phone   # set it

@@ -348,6 +348,7 @@ enum Client {
             env.append("floor \(st.floor == 0 ? "off" : "\(st.floor)%")")
             if st.power.lowPowerMode { env.append("low power mode") }
         }
+        if st.thermalCritical { env.append("critical heat, lid refused") }
         if !env.isEmpty { print(dim("   " + env.joined(separator: " · "))) }
         // The upgrade nudge, from the daemon's last feed read; the check itself
         // is one GET a day (awake updates off silences it).

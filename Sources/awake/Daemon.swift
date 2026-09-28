@@ -127,13 +127,19 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ).takeRetainedValue()
         CFRunLoopAddSource(CFRunLoopGetMain(), iops, .defaultMode)
         NotificationCenter.default.addObserver(
-            self, selector: #selector(powerStateChanged),
+            self, selector: #selector(environmentChanged),
             name: Notification.Name.NSProcessInfoPowerStateDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(environmentChanged),
+            name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
 
         pollTimer = Timer.scheduledTimer(
             timeInterval: 60, target: self,
             selector: #selector(pollTick),
             userInfo: nil, repeats: true)
+        // Startup re-armed persisted claims before the hooks existed; the nets judge
+        // them now, with notifications wired, not a poll interval later.
+        machine.tick()
         grantReady = Grant.works()
         render()
     }
@@ -234,7 +240,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc nonisolated private func powerStateChanged() {
+    @objc nonisolated private func environmentChanged() {
         DispatchQueue.main.async {
             MainActor.assumeIsolated { Daemon.shared.machine.tick() }
         }
@@ -890,6 +896,10 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return "Battery at \(p)%. Sleep restored."
         case .lowPowerMode:
             return "Low Power Mode is on. \(still)"
+        case .thermal:
+            let labels = Client.summarize(ended).map(\.owner).joined(separator: ", ")
+            return
+                "Critical heat: lid-closed survival ended (\(labels)), closing the lid sleeps it. \(still)"
         case .externalOff:
             return "Sleep was re-enabled outside awake. All claims ended."
         case .expired:

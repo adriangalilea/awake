@@ -10,6 +10,7 @@ public enum EndReason: Sendable {
     case pidExited(Int32)  // -w target is gone
     case batteryFloor(Int)  // percent at trip time; always wins, ends everything
     case lowPowerMode  // ends unforced claims only
+    case thermal  // critical thermal pressure; ends every claim holding the lid
     case externalOff  // someone flipped the flag off under us; they win
     case shutdown  // daemon quitting
 
@@ -21,6 +22,7 @@ public enum EndReason: Sendable {
         case .pidExited(let pid): return "pid-exited:\(pid)"
         case .batteryFloor(let p): return "battery-floor:\(p)"
         case .lowPowerMode: return "low-power-mode"
+        case .thermal: return "thermal"
         case .externalOff: return "external-off"
         case .shutdown: return "shutdown"
         }
@@ -30,7 +32,7 @@ public enum EndReason: Sendable {
     /// these also go through the out-of-band notify hook.
     public var outOfBand: Bool {
         switch self {
-        case .batteryFloor, .lowPowerMode: return true
+        case .batteryFloor, .lowPowerMode, .thermal: return true
         default: return false
         }
     }
@@ -39,6 +41,7 @@ public enum EndReason: Sendable {
 public enum EngageError: Error, Equatable, Sendable {
     case grantMissing
     case belowFloor(percent: Int, floor: Int)
+    case thermalCritical
     case lidFailed(String)
 
     public var message: String {
@@ -47,6 +50,8 @@ public enum EngageError: Error, Equatable, Sendable {
             return "The sudoers grant is missing. Run: awake grant"
         case .belowFloor(let percent, let floor):
             return "Battery \(percent)% is at or below your \(floor)% floor. Not arming."
+        case .thermalCritical:
+            return "The Mac is at critical heat. Not arming lid-closed survival until it cools."
         case .lidFailed(let err):
             return "pmset failed: \(err)"
         }
@@ -69,6 +74,8 @@ public struct Status: Codable, Equatable, Sendable {
     /// same arithmetic instead of re-deriving it.
     public var lidArmed: Bool
     public var askPending: Bool
+    /// `ProcessInfo.thermalState == .critical`: lid claims are ended and refused.
+    public var thermalCritical: Bool
     /// The human's "let it sleep" switch (right-click, hotkey, `awake suspend`):
     /// every claim is kept but inert until resumed. nil = not suspended.
     public var suspendedSince: Date?
@@ -187,6 +194,10 @@ public final class StateMachine {
         {
             claim.lidGranted = true
         }
+        // Don't arm what the thermal guard tears down on the next tick.
+        if claim.effectiveModes.contains(.lid), Self.thermalCritical {
+            return .failure(.thermalCritical)
+        }
         let power = Battery.snapshot()
         if power.discharging, config.batteryFloorPercent > 0,
             power.percent <= config.batteryFloorPercent
@@ -259,6 +270,9 @@ public final class StateMachine {
         tick()
         suspendedSince = nil
         SuspendStore.save(nil)
+        // The tick above skipped the guard (nothing held the lid); lifting must not
+        // arm the lid for a poll interval at critical heat.
+        thermalGuard()
         let result = apply()
         if result != .ok { log("resume: lid flip failed (\(result))") }
         log("resumed by the human (\(claims.count) claim(s) back in effect)")
@@ -314,6 +328,7 @@ public final class StateMachine {
     /// Idempotent; the grant dies with the claim.
     @discardableResult
     public func resolveLidWant(_ ids: Set<UUID>, granted: Bool) -> Result<[Claim], EngageError> {
+        if granted, Self.thermalCritical { return .failure(.thermalCritical) }
         let before = claims
         var touched: [Claim] = []
         for i in claims.indices where ids.contains(claims[i].id) && claims[i].wantsLid {
@@ -398,6 +413,8 @@ public final class StateMachine {
             return
         }
 
+        thermalGuard()
+
         let expired = claims.filter {
             if case .until(let d) = $0.term { return d <= Date() }
             return false
@@ -423,6 +440,25 @@ public final class StateMachine {
                 if !yielding.isEmpty { end(Set(yielding.map(\.id)), .lowPowerMode) }
             }
         }
+    }
+
+    public static var thermalCritical: Bool {
+        ProcessInfo.processInfo.thermalState == .critical
+    }
+
+    /// The heat net. The lid flag is the one thing that keeps a closed Mac awake in
+    /// a bag, and macOS only steps in at Thermal Emergency Sleep: 2026-09-25 sat at
+    /// `.critical` from 20:12 to 23:05, die at 95 °C, battery at 37 %. At `.critical`
+    /// every claim holding the lid ends, whatever its owner or `forced`; claims
+    /// without the lid keep running (lid open, macOS throttles). `.serious` is
+    /// ordinary sustained load and would end legitimate lid-closed work on a desk.
+    /// Nothing re-arms on cooling: engage and grant refuse while critical, and
+    /// after that re-arming is a human or caller act.
+    private func thermalGuard() {
+        guard !suspended, Self.thermalCritical else { return }
+        let holding = claims.filter { $0.effectiveModes.contains(.lid) }
+        guard !holding.isEmpty else { return }
+        end(Set(holding.map(\.id)), .thermal)
     }
 
     /// The floor's second net. Ending our claims at the floor only LETS the Mac
@@ -462,6 +498,7 @@ public final class StateMachine {
             keepDisplay: config.menuDisplay,
             lidArmed: lidArmed,
             askPending: askPending,
+            thermalCritical: Self.thermalCritical,
             suspendedSince: suspendedSince,
             updateCheck: config.updateCheck,
             latestVersion: config.latestVersion)
