@@ -57,10 +57,6 @@
     },
     {
       "author" : true,
-      "kind" : "work"
-    },
-    {
-      "author" : true,
       "kind" : "caption",
       "text" : "Your agent has hours of work ahead."
     },

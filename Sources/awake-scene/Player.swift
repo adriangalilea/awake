@@ -28,7 +28,8 @@ struct ScriptError: Error {
 ///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
 ///            "sent before the story" · agent prompt "typed now" · agent say "…" ·
 ///            agent run awake -w 4127 --lid (a tool call awake answers for real) ·
-///            agent work (it starts working; the CLI words that line) · agent done "…" ·
+///            agent done "…" (a prompt sets it working, done ends the turn; the
+///            working and finished lines are the CLI's own words) ·
 ///            agent tool Update "src/x.ts" "Updated with 40 additions" (its own work)
 ///            Agent steps written while the lid is shut happen in the dark: they are
 ///            read, and marked as new, when it opens. Show what got done.
@@ -205,13 +206,6 @@ final class Player {
             s.text = words[0]
             s.arg = rest.isEmpty ? "~" : rest
             emit(s, author: true)
-        case "work":
-            // The working line's words are the CLI's own (Claude Code's playful verbs,
-            // Codex's "Working"), drawn by its skin, never the script's.
-            guard rest.isEmpty else {
-                throw fail("agent work takes no text: the CLI words its own working line")
-            }
-            emit(Step(.work), author: true)
         case "history", "prompt", "say", "done":
             let kinds: [String: Step.Kind] = [
                 "history": .history, "prompt": .prompt, "say": .say, "done": .done,
@@ -236,7 +230,7 @@ final class Player {
             emit(s, author: true)
         default:
             throw fail(
-                "agent claude|codex [cwd] · agent history|prompt|say|done \"text\" · agent work · agent tool Name \"arg\" \"result\"… · agent run awake …"
+                "agent claude|codex [cwd] · agent history|prompt|say|done \"text\" · agent tool Name \"arg\" \"result\"… · agent run awake …"
             )
         }
     }

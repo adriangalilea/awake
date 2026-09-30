@@ -11,7 +11,6 @@ open menu
 hover "Allow while it runs"
 click "Allow while it runs"
 caption "Only you can allow it."
-agent work
 lid close
 time +2h14m · battery 38
 agent tool Bash "git diff --stat" "14 files changed, 612 insertions(+), 380 deletions(-)"

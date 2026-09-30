@@ -38,7 +38,7 @@ struct Step: Encodable {
         case world, glyph, command, output, muted, menu, close, hover, press, key
         case rightClick = "right-click"
         case banner, caption
-        case agent, history, prompt, say, tool, work, done
+        case agent, history, prompt, say, tool, done
     }
 
     init(_ kind: Kind, delay: Int? = nil) {

@@ -205,10 +205,6 @@
     },
     {
       "author" : true,
-      "kind" : "work"
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
