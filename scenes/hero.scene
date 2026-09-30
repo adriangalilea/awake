@@ -9,6 +9,7 @@ agent say "On it. This touches every billing module, so it will take a while."
 
 key
 caption "Press ⌃⌥⌘A to keep your Mac awake."
+poster
 lid close
 time +1h50m · battery 58
 caption "Close the lid and walk away."

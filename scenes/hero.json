@@ -57,6 +57,10 @@
     },
     {
       "author" : true,
+      "kind" : "poster"
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,

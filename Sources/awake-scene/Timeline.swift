@@ -37,7 +37,7 @@ struct Step: Encodable {
     enum Kind: String, Encodable {
         case world, glyph, command, output, muted, menu, close, hover, press, key
         case rightClick = "right-click"
-        case banner, caption
+        case banner, caption, poster
         case agent, history, prompt, say, tool, done
     }
 

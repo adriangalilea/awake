@@ -24,7 +24,9 @@ struct ScriptError: Error {
 ///   terminal $ awake -w 4127 --lid     ($! when the command is meant to fail)
 ///   menu     open menu · hover "Title" · click "Title" · close menu
 ///   gestures key (the toggle chord) · right-click
-///   stage    caption "text" · wait 1200
+///   stage    caption "text" · wait 1200 · poster (the frame a still of the story
+///            shows: the link card, a shelf; it takes no time, and lands once all
+///            before it has been read)
 ///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
 ///            "sent before the story" · agent prompt "typed now" · agent say "…" ·
 ///            agent run awake -w 4127 --lid (a tool call awake answers for real) ·
@@ -139,6 +141,11 @@ final class Player {
             var s = Step(.caption)
             s.text = try quoted(rest)
             emit(s, author: true)
+        case "poster":
+            guard rest.isEmpty, !steps.contains(where: { $0.kind == .poster }) else {
+                throw fail("'poster' marks the one frame a still shows, once, and takes nothing")
+            }
+            emit(Step(.poster), author: true)
         case "agent":
             try agent(rest)
         case "wait":
