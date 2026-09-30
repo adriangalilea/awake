@@ -3,6 +3,7 @@
 clock 22:40 · battery 76 · floor 15
 agent claude ~/billing
 agent prompt "Migrate billing to the v2 API. Make no mistakes."
+wait 5000
 agent say "On it. This touches every billing module, so it will take a while."
 agent tool Read "src/billing/client.ts" "Read 412 lines"
 agent tool Bash "rg -l 'api/v1' src" "src/billing/client.ts" "src/billing/invoices.ts" "src/billing/refunds.ts"

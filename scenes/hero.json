@@ -32,6 +32,7 @@
     },
     {
       "author" : true,
+      "delay" : 5000,
       "kind" : "say",
       "text" : "On it. This touches every billing module, so it will take a while."
     },
