@@ -53,6 +53,22 @@ let rawArgs = CommandLine.arguments
 let invocation = URL(fileURLWithPath: rawArgs[0]).lastPathComponent
 let args = Array(rawArgs.dropFirst())
 
+// LaunchServices (a double click, Spotlight, `open`) starts the bundle with no
+// arguments and launchd as parent. That launch means "make awake run": install the
+// agent for this image. It is also how the cask installs: launchd refuses bootstrap
+// to any sandboxed caller, Homebrew runs cask steps sandboxed, and an app opened
+// through LaunchServices runs outside the sandbox of whoever opened it. Output goes
+// to the service log, since nobody reads an LS-launched process's stderr.
+if args.isEmpty, getppid() == 1, Bundle.main.bundleIdentifier != nil {
+    Paths.ensureLogDir()
+    let serviceLog = Paths.logDir.appendingPathComponent("service.log").path
+    precondition(
+        freopen(serviceLog, "a", stdout) != nil && freopen(serviceLog, "a", stderr) != nil)
+    log("launched by LaunchServices, installing the agent")
+    Agent.install()
+    exit(0)
+}
+
 if invocation == "asleep" {
     Client.end(args.first)
     exit(0)

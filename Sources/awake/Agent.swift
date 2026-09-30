@@ -2,9 +2,9 @@ import AwakeKit
 import Foundation
 
 /// The launchd agent, owned by the BINARY rather than by an installer, because
-/// there is more than one installer: `mise run install`, a Homebrew cask's postflight,
-/// and a human doing it by hand all have to land the same plist pointed at the
-/// same image. A copy of this logic in an install script is a copy that drifts.
+/// there is more than one installer: `mise run install`, a LaunchServices launch
+/// (double click, and the Homebrew cask's step), and a human doing it by hand all
+/// have to land the same plist pointed at the same image. A copy of this logic in an install script is a copy that drifts.
 enum Agent {
     static func run(_ args: [String]) {
         switch args.first {

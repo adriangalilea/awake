@@ -234,6 +234,10 @@ public enum Paths {
     public static func ensureStateDir() {
         try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
     }
+
+    public static func ensureLogDir() {
+        try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+    }
 }
 
 /// Daemon config, persisted. Floor 0 disables the cutoff. Decoding tolerates missing
