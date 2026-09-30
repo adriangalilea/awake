@@ -192,21 +192,6 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
         }
     }
 
-    /// Expired/orphaned claims are invalid and must be torn down, not re-armed.
-    /// A claim predating the current boot is ALWAYS invalid, whatever its term.
-    public func isValid(now: Date = Date()) -> Bool {
-        guard startedAt >= bootTime() else { return false }
-        switch term {
-        case .indefinite: return true
-        case .until(let d): return d > now
-        case .whilePid(let pid, let started): return procStartTime(pid) == started
-        }
-    }
-
-    public func remaining(now: Date = Date()) -> TimeInterval? {
-        if case .until(let d) = term { return max(0, d.timeIntervalSince(now)) }
-        return nil
-    }
 }
 
 /// Everything on disk lives here. Single place, no scattered paths.

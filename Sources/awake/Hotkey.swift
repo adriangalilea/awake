@@ -1,4 +1,5 @@
 import AwakeKit
+import AwakeSurface
 import Foundation
 import Keymap
 import SwiftUI

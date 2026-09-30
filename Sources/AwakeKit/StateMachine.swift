@@ -1,4 +1,3 @@
-import CoreGraphics
 import Foundation
 import Grant
 import IOKit.pwr_mgt
@@ -104,6 +103,8 @@ public final class StateMachine {
     public private(set) var suspendedSince: Date?
     public var suspended: Bool { suspendedSince != nil }
     public private(set) var config: Config
+    /// Every read and write outside the machine goes through here.
+    public let world: any World
     private var held: [Mode: IOPMAssertionID] = [:]
 
     /// UI refresh hook (menu bar glyph). Fired after every transition.
@@ -116,9 +117,10 @@ public final class StateMachine {
     /// audio, a download). Argument: battery percent. Routed out of band too.
     public var onForcedSleep: ((Int) -> Void)?
 
-    public init() {
-        config = Config.load()
-        suspendedSince = SuspendStore.load()
+    public init(world: any World) {
+        self.world = world
+        config = world.loadConfig()
+        suspendedSince = world.loadSuspended()
         reconcileStartup()
     }
 
@@ -129,8 +131,8 @@ public final class StateMachine {
     /// kernel flag is on: an external writer (or unclean death) set it — ADOPT it as
     /// an indefinite unforced claim instead of silently undoing someone's decision.
     private func reconcileStartup() {
-        let persisted = ClaimStore.load()
-        let valid = persisted.filter { $0.isValid() }
+        let persisted = world.loadClaims()
+        let valid = persisted.filter { isValid($0) }
         for dropped in persisted where !valid.contains(dropped) {
             log("startup: dropping stale claim \(dropped)")
         }
@@ -147,16 +149,32 @@ public final class StateMachine {
                 _ = apply()
             }
             persist()
-        } else if Kernel.sleepDisabled() {
+        } else if world.sleepDisabled() {
             log("startup: kernel flag on with no claims, adopting as indefinite")
-            claims = [
-                Claim(owner: Claim.adoptedOwner, forced: false, modes: [.lid], term: .indefinite)
-            ]
+            claims = [adopted()]
             persist()
         } else {
             persist()  // clears a file that held only stale claims
         }
         onChange?()
+    }
+
+    /// Expired/orphaned claims are invalid and must be torn down, not re-armed.
+    /// A claim predating the current boot is ALWAYS invalid, whatever its term.
+    private func isValid(_ claim: Claim) -> Bool {
+        guard claim.startedAt >= world.bootTime else { return false }
+        switch claim.term {
+        case .indefinite: return true
+        case .until(let d): return d > world.now
+        case .whilePid(let pid, let started): return world.processStartTime(pid) == started
+        }
+    }
+
+    /// The machine's claim on a kernel flag it found set by someone else.
+    private func adopted() -> Claim {
+        Claim(
+            owner: Claim.adoptedOwner, forced: false, modes: [.lid], term: .indefinite,
+            startedAt: world.now)
     }
 
     // MARK: - Public transitions
@@ -199,10 +217,10 @@ public final class StateMachine {
             claim.lidGranted = true
         }
         // Don't arm what the thermal guard tears down on the next tick.
-        if claim.effectiveModes.contains(.lid), Self.thermalCritical {
+        if claim.effectiveModes.contains(.lid), world.thermalCritical {
             return .failure(.thermalCritical)
         }
-        let power = Battery.snapshot()
+        let power = world.power()
         if power.discharging, config.batteryFloorPercent > 0,
             power.percent <= config.batteryFloorPercent
         {
@@ -257,8 +275,8 @@ public final class StateMachine {
     /// The human's "let it sleep": effect off, intent kept. Idempotent.
     public func suspend() {
         guard !suspended else { return }
-        suspendedSince = Date()
-        SuspendStore.save(suspendedSince)
+        suspendedSince = world.now
+        world.saveSuspended(suspendedSince)
         _ = apply()
         log("suspended by the human (\(claims.count) claim(s) kept inert)")
         onChange?()
@@ -273,7 +291,7 @@ public final class StateMachine {
         // false externalOff that ended every claim, 2026-08-17).
         tick()
         suspendedSince = nil
-        SuspendStore.save(nil)
+        world.saveSuspended(nil)
         // The tick above skipped the guard (nothing held the lid); lifting must not
         // arm the lid for a poll interval at critical heat.
         thermalGuard()
@@ -303,13 +321,13 @@ public final class StateMachine {
     public func rememberDuration(_ minutes: Int) {
         guard minutes != config.lastMinutes else { return }
         config.lastMinutes = minutes
-        config.save()
+        world.saveConfig(config)
     }
 
     public func setMenuDisplay(_ on: Bool) {
         guard on != config.menuDisplay else { return }
         config.menuDisplay = on
-        config.save()
+        world.saveConfig(config)
         _ = apply()
     }
 
@@ -332,7 +350,7 @@ public final class StateMachine {
     /// Idempotent; the grant dies with the claim.
     @discardableResult
     public func resolveLidWant(_ ids: Set<UUID>, granted: Bool) -> Result<[Claim], EngageError> {
-        if granted, Self.thermalCritical { return .failure(.thermalCritical) }
+        if granted, world.thermalCritical { return .failure(.thermalCritical) }
         let before = claims
         var touched: [Claim] = []
         for i in claims.indices where ids.contains(claims[i].id) && claims[i].wantsLid {
@@ -367,7 +385,7 @@ public final class StateMachine {
     /// the daemon holds config in memory and the next save would clobber the edit.
     public func setNotifyCommand(_ command: String) {
         config.notifyCommand = command.trimmingCharacters(in: .whitespaces)
-        config.save()
+        world.saveConfig(config)
         log(
             config.notifyCommand.isEmpty
                 ? "notify hook cleared"
@@ -377,7 +395,7 @@ public final class StateMachine {
     public func setFloor(_ percent: Int) {
         let clamped = max(Config.floorRange.lowerBound, min(Config.floorRange.upperBound, percent))
         config.batteryFloorPercent = clamped
-        config.save()
+        world.saveConfig(config)
         log("floor set to \(clamped)%")
         tick()  // a raised floor may immediately end the running claims
         onChange?()
@@ -386,21 +404,18 @@ public final class StateMachine {
     /// The heartbeat: expiry, pid liveness, battery floor, LPM, external writers.
     /// Runs every poll tick, on power-source change, and before every status render.
     public func tick() {
-        let flagOn = Kernel.sleepDisabled()
+        let flagOn = world.sleepDisabled()
         // A human at the terminal setting the flag by hand is the one voice that
         // outranks the suspend switch: adopt the flag AND lift the switch.
         if flagOn, suspended {
             log("tick: external writer turned the flag on while suspended, resuming")
             suspendedSince = nil
-            SuspendStore.save(nil)
+            world.saveSuspended(nil)
         }
         guard !claims.isEmpty else {
             if flagOn {
                 log("tick: external writer turned the flag on, adopting")
-                claims = [
-                    Claim(
-                        owner: Claim.adoptedOwner, forced: false, modes: [.lid], term: .indefinite)
-                ]
+                claims = [adopted()]
                 persist()
                 onChange?()
                 return
@@ -419,21 +434,22 @@ public final class StateMachine {
 
         thermalGuard()
 
+        let now = world.now
         let expired = claims.filter {
-            if case .until(let d) = $0.term { return d <= Date() }
+            if case .until(let d) = $0.term { return d <= now }
             return false
         }
         if !expired.isEmpty { end(Set(expired.map(\.id)), .expired) }
 
         for claim in claims {
             if case .whilePid(let pid, let started) = claim.term,
-                procStartTime(pid) != started
+                world.processStartTime(pid) != started
             {
                 end([claim.id], .pidExited(pid))
             }
         }
 
-        let power = Battery.snapshot()
+        let power = world.power()
         if power.discharging, !claims.isEmpty {
             if config.batteryFloorPercent > 0, power.percent <= config.batteryFloorPercent {
                 endAll(.batteryFloor(power.percent))
@@ -446,10 +462,6 @@ public final class StateMachine {
         }
     }
 
-    public static var thermalCritical: Bool {
-        ProcessInfo.processInfo.thermalState == .critical
-    }
-
     /// The heat net. The lid flag is the one thing that keeps a closed Mac awake in
     /// a bag, and macOS only steps in at Thermal Emergency Sleep: 2026-09-25 sat at
     /// `.critical` from 20:12 to 23:05, die at 95 °C, battery at 37 %. At `.critical`
@@ -459,7 +471,7 @@ public final class StateMachine {
     /// Nothing re-arms on cooling: engage and grant refuse while critical, and
     /// after that re-arming is a human or caller act.
     private func thermalGuard() {
-        guard !suspended, Self.thermalCritical else { return }
+        guard !suspended, world.thermalCritical else { return }
         let holding = claims.filter { $0.effectiveModes.contains(.lid) }
         guard !holding.isEmpty else { return }
         end(Set(holding.map(\.id)), .thermal)
@@ -474,36 +486,38 @@ public final class StateMachine {
     /// onto battery below the floor sleeps again within a minute. That IS the floor.
     private func sweepBelowFloor() {
         guard config.batteryFloorPercent > 0 else { return }
-        let power = Battery.snapshot()
+        let power = world.power()
         guard power.hasBattery, power.discharging,
             power.percent <= config.batteryFloorPercent
         else { return }
-        guard CGDisplayIsAsleep(CGMainDisplayID()) != 0 else { return }
+        guard world.displayAsleep else { return }
         log(
             "below floor (\(power.percent)% <= \(config.batteryFloorPercent)%), no claims, display dark, still awake: forcing sleep"
         )
         onForcedSleep?(power.percent)
-        let r = run("/usr/bin/pmset", ["sleepnow"])
-        if r.status != 0 {
-            log(
-                "pmset sleepnow failed (\(r.status)): \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
-            )
-        }
+        world.sleepNow()
     }
 
+    /// The heartbeat, then the state it leaves.
     public func status() -> Status {
         tick()
-        return Status(
+        return snapshot()
+    }
+
+    /// The state as it stands, without a heartbeat: for redrawing an open menu,
+    /// where a tick could end a claim under the pointer.
+    public func snapshot() -> Status {
+        Status(
             claims: claims.sorted { $0.startedAt < $1.startedAt },
-            sleepDisabled: Kernel.sleepDisabled(),
-            power: Battery.snapshot(),
+            sleepDisabled: world.sleepDisabled(),
+            power: world.power(),
             floor: config.batteryFloorPercent,
             notifyCommand: config.notifyCommand,
             keepDisplay: config.menuDisplay,
             lidArmed: lidArmed,
             askPending: askPending,
-            thermalCritical: Self.thermalCritical,
-            notifications: NotificationStore.load(),
+            thermalCritical: world.thermalCritical,
+            notifications: world.notificationReach(),
             suspendedSince: suspendedSince,
             updateCheck: config.updateCheck,
             latestVersion: config.latestVersion)
@@ -513,33 +527,33 @@ public final class StateMachine {
 
     public func setUpdateCheck(_ on: Bool) {
         config.updateCheck = on
-        config.save()
+        world.saveConfig(config)
         log("update check \(on ? "on (daily)" : "off")")
     }
 
     public var updateCheckDue: Bool {
-        config.updateCheck && (config.nextUpdateCheck.map { $0 <= Date() } ?? true)
+        config.updateCheck && (config.nextUpdateCheck.map { $0 <= world.now } ?? true)
     }
 
     /// Record a feed read. Returns the version to announce, if this one is
     /// newer than `running` and has not been announced before.
     public func recordUpdateCheck(latest: String?, running: String) -> String? {
         if let latest {
-            config.nextUpdateCheck = Date().addingTimeInterval(24 * 3600)
+            config.nextUpdateCheck = world.now.addingTimeInterval(24 * 3600)
             config.latestVersion = latest
             var announce: String? = nil
             if versionIsNewer(latest, than: running), config.updateAnnounced != latest {
                 config.updateAnnounced = latest
                 announce = latest
             }
-            config.save()
+            world.saveConfig(config)
             log(
                 "update check: latest \(latest), running \(running)\(announce != nil ? ", announcing" : "")"
             )
             return announce
         }
-        config.nextUpdateCheck = Date().addingTimeInterval(3600)
-        config.save()
+        config.nextUpdateCheck = world.now.addingTimeInterval(3600)
+        world.saveConfig(config)
         return nil
     }
 
@@ -565,18 +579,18 @@ public final class StateMachine {
         for mode in [Mode.idle, .display] {
             let want = wanted.contains(mode)
             let have = held[mode] != nil
-            if want, !have { held[mode] = Kernel.createAssertion(mode) }
+            if want, !have { held[mode] = world.createAssertion(mode) }
             if !want, have {
-                Kernel.releaseAssertion(held[mode]!)
+                world.releaseAssertion(held[mode]!)
                 held[mode] = nil
             }
         }
 
         // The lid flag: kernel-owned, root-gated.
         let wantLid = wanted.contains(.lid)
-        let haveLid = Kernel.sleepDisabled()
+        let haveLid = world.sleepDisabled()
         if wantLid != haveLid {
-            let result = Kernel.setSleepDisabled(wantLid)
+            let result = world.setSleepDisabled(wantLid)
             if result != .ok {
                 log("lid flip to \(wantLid) failed: \(result)")
             }
@@ -586,6 +600,6 @@ public final class StateMachine {
     }
 
     private func persist() {
-        ClaimStore.save(claims)
+        world.saveClaims(claims)
     }
 }

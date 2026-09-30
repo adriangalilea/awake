@@ -7,6 +7,14 @@ public struct PowerSnapshot: Codable, Equatable, Sendable {
     public let discharging: Bool
     public let percent: Int
     public let lowPowerMode: Bool
+
+    public init(hasBattery: Bool, onAC: Bool, discharging: Bool, percent: Int, lowPowerMode: Bool) {
+        self.hasBattery = hasBattery
+        self.onAC = onAC
+        self.discharging = discharging
+        self.percent = percent
+        self.lowPowerMode = lowPowerMode
+    }
 }
 
 public enum Battery {
