@@ -1,5 +1,5 @@
 # A coding agent asks awake to keep working with the lid closed. You allow it once;
-# when the work ends, the Mac sleeps on its own.
+# it works through the night behind the shut lid, and when it is done the Mac sleeps.
 clock 21:04 · battery 64 · floor 15
 process 4127 codex
 agent codex ~/invoices
@@ -14,7 +14,9 @@ caption "You allow it, once."
 agent work "Refactoring the invoice pipeline"
 lid close
 time +2h14m · battery 38
-agent done "Done: 14 files changed, all 1,284 tests pass."
+agent tool Bash "git diff --stat" "14 files changed, 612 insertions(+), 380 deletions(-)"
+agent tool Bash "npm test" "1,284 passed, 0 failed"
+agent done "Done: the pipeline streams, all 1,284 tests pass."
 exit 4127
-caption "When Codex finishes, the Mac sleeps."
 lid open
+caption "Codex finished; awake let the Mac sleep."

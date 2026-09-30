@@ -28,7 +28,10 @@ struct ScriptError: Error {
 ///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
 ///            "sent before the story" · agent prompt "typed now" · agent say "…" ·
 ///            agent run awake -w 4127 --lid (a tool call awake answers for real) ·
-///            agent work "Refactoring the pipeline" · agent done "…"
+///            agent work "Refactoring the pipeline" · agent done "…" ·
+///            agent tool Update "src/x.ts" "Updated with 40 additions" (its own work)
+///            Agent steps written while the lid is shut happen in the dark: they are
+///            read, and marked as new, when it opens. Show what got done.
 /// Show, then tell: a caption goes AFTER the step it explains, so the viewer sees
 /// the thing happen and then reads what it was. Pauses are rarely needed: the player
 /// waits for everything a step put on screen to be read before the next one.
@@ -215,9 +218,18 @@ final class Player {
             s.arg = rest
             s.lines = try run(rest, expectFailure: false).map(\.0)
             emit(s, author: true)
+        case "tool":
+            // The agent's own work (not awake's): a tool, its argument, what came back.
+            let w = try shellWords(rest)
+            guard w.count >= 2 else { throw fail("agent tool Name \"arg\" \"result\"...") }
+            var s = Step(.tool)
+            s.text = w[0]
+            s.arg = w[1]
+            s.lines = Array(w.dropFirst(2))
+            emit(s, author: true)
         default:
             throw fail(
-                "agent claude|codex [cwd] · agent history|prompt|say|work|done \"text\" · agent run awake …"
+                "agent claude|codex [cwd] · agent history|prompt|say|work|done \"text\" · agent tool Name \"arg\" \"result\"… · agent run awake …"
             )
         }
     }

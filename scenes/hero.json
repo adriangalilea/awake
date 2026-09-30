@@ -75,9 +75,31 @@
       }
     },
     {
+      "arg" : "src/billing/client.ts",
       "author" : true,
-      "kind" : "caption",
-      "text" : "Lid closed, still working."
+      "kind" : "tool",
+      "lines" : [
+        "Updated src/billing/client.ts with 212 additions and 98 removals"
+      ],
+      "text" : "Update"
+    },
+    {
+      "arg" : "src/billing/invoices.ts",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "Updated src/billing/invoices.ts with 64 additions and 41 removals"
+      ],
+      "text" : "Update"
+    },
+    {
+      "arg" : "npm test",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "1,284 passed, 0 failed"
+      ],
+      "text" : "Bash"
     },
     {
       "author" : true,
@@ -90,6 +112,11 @@
         "heat" : false,
         "lid" : "open"
       }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Lid closed, the work went on."
     }
   ]
 }

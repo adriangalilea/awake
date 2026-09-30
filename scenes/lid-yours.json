@@ -233,9 +233,27 @@
       }
     },
     {
+      "arg" : "git diff --stat",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "14 files changed, 612 insertions(+), 380 deletions(-)"
+      ],
+      "text" : "Bash"
+    },
+    {
+      "arg" : "npm test",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "1,284 passed, 0 failed"
+      ],
+      "text" : "Bash"
+    },
+    {
       "author" : true,
       "kind" : "done",
-      "text" : "Done: 14 files changed, all 1,284 tests pass."
+      "text" : "Done: the pipeline streams, all 1,284 tests pass."
     },
     {
       "author" : true,
@@ -271,11 +289,6 @@
     },
     {
       "author" : true,
-      "kind" : "caption",
-      "text" : "When Codex finishes, the Mac sleeps."
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -285,6 +298,11 @@
         "heat" : false,
         "lid" : "open"
       }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Codex finished; awake let the Mac sleep."
     }
   ]
 }
