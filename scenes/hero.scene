@@ -1,16 +1,18 @@
-# The value in one breath: an agent is at work, one chord keeps the Mac awake, the
-# lid closes, time passes, and the work is further along when it opens.
+# The value in one breath: an agent is at work, ⌃⌥⌘A turns awake on, the lid
+# closes, time passes, and the work is further along when it opens.
 clock 22:40 · battery 76 · floor 15
 agent claude ~/billing
 agent history "Migrate billing to the v2 API and run the whole test suite."
 agent work "Migrating billing to the v2 API"
+caption "Claude Code is migrating billing. It needs hours."
 
 key
-caption "One chord keeps the Mac awake."
+caption "Press ⌃⌥⌘A: the cup fills, awake is on."
 lid close
 time +1h50m · battery 58
+caption "Close the lid. The Mac stays awake."
 agent tool Update "src/billing/client.ts" "Updated src/billing/client.ts with 212 additions and 98 removals"
 agent tool Update "src/billing/invoices.ts" "Updated src/billing/invoices.ts with 64 additions and 41 removals"
 agent tool Bash "npm test" "1,284 passed, 0 failed"
 lid open
-caption "Lid closed, the work went on."
+caption "Open it 1h 50m later: migrated, 1,284 tests pass."

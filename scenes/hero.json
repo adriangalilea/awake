@@ -37,6 +37,11 @@
     },
     {
       "author" : true,
+      "kind" : "caption",
+      "text" : "Claude Code is migrating billing. It needs hours."
+    },
+    {
+      "author" : true,
       "keys" : "⌃⌥⌘A",
       "kind" : "key"
     },
@@ -48,7 +53,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "One chord keeps the Mac awake."
+      "text" : "Press ⌃⌥⌘A: the cup fills, awake is on."
     },
     {
       "author" : true,
@@ -73,6 +78,11 @@
         "heat" : false,
         "lid" : "closed"
       }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Close the lid. The Mac stays awake."
     },
     {
       "arg" : "src/billing/client.ts",
@@ -116,7 +126,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Lid closed, the work went on."
+      "text" : "Open it 1h 50m later: migrated, 1,284 tests pass."
     }
   ]
 }
