@@ -38,6 +38,14 @@ enum Agent {
     }
 
     static func install() {
+        restart()
+        say("✓ agent running (\(Paths.launchdLabel)) → \(Bundle.main.bundlePath)")
+        Notifier.launch(["--prime"])
+    }
+
+    /// The daemon running THIS bundle's image, whatever state the job is in: the one
+    /// way anything (install, the CLI finding no daemon, a hotkey remap) restarts it.
+    static func restart() {
         removeUserAgentPlist()
         if registered, running {
             // A reinstall: restart into the image the bundle holds now. The SIGTERM
@@ -63,8 +71,6 @@ enum Agent {
                 )
             }
         }
-        say("✓ agent running (\(Paths.launchdLabel)) → \(Bundle.main.bundlePath)")
-        Notifier.launch(["--prime"])
     }
 
     static var running: Bool {

@@ -60,11 +60,9 @@ enum Hotkey {
         return KeyCombo(key, modifiers)
     }
 
-    /// The daemon's Carbon registrations only rebuild in-process; a kickstart makes
+    /// The daemon's Carbon registrations only rebuild in-process; a restart makes
     /// the new binding live now instead of at next login.
     private static func bounceDaemon() {
-        _ = AwakeKit.run(
-            "/bin/launchctl",
-            ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
+        Agent.restart()
     }
 }

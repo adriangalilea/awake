@@ -10,18 +10,12 @@ enum Client {
         exit(1)
     }
 
-    /// One round trip, bringing the daemon up when it isn't reachable: no agent
-    /// registered (a fresh `brew install`, or unregistered) → register it; registered
-    /// → kickstart -k, which also recovers a wedged daemon (alive but not accepting).
+    /// One round trip, bringing the daemon up when it isn't reachable: a fresh
+    /// `brew install` registers the agent here, a wedged daemon (alive but not
+    /// accepting) is restarted, a job launchd gave up on is registered again.
     static func send(_ cmd: Command) -> Reply {
         if let r = Wire.roundTrip(cmd) { return r }
-        if Agent.registered, Agent.running {
-            _ = AwakeKit.run(
-                "/bin/launchctl",
-                ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
-        } else {
-            Agent.install()
-        }
+        if Agent.registered { Agent.restart() } else { Agent.install() }
         for _ in 0..<50 {
             usleep(100_000)
             if let r = Wire.roundTrip(cmd) { return r }
