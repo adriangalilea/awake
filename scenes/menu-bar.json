@@ -31,7 +31,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Right-click the cup: it fills, awake is on."
+      "text" : "Right-click the cup to turn it on."
     },
     {
       "author" : true,
@@ -46,7 +46,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Press ⌃⌥⌘A: it empties, the Mac sleeps normally again."
+      "text" : "Or press ⌃⌥⌘A, from anywhere."
     },
     {
       "author" : true,
@@ -69,7 +69,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Type awake in a terminal: the same switch."
+      "text" : "Or type awake in a terminal."
     },
     {
       "author" : true,
@@ -164,7 +164,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Left-click the cup: the menu shows what holds the Mac awake."
+      "text" : "Click the cup to see what keeps your Mac awake."
     },
     {
       "author" : true,

@@ -66,7 +66,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Codex asks to keep working with the lid closed."
+      "text" : "Agents can ask to keep working with the lid closed."
     },
     {
       "author" : true,
@@ -201,7 +201,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "You allow it, once."
+      "text" : "Only you can allow it."
     },
     {
       "author" : true,
@@ -302,7 +302,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Codex finished; awake let the Mac sleep."
+      "text" : "When the work is done, your Mac sleeps again."
     }
   ]
 }

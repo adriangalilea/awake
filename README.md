@@ -2,7 +2,7 @@
 
 Keep a Mac awake, **lid closed included**. One state machine, a menu bar cup and a CLI on top of it.
 
-![Claude Code is at work; ⌃⌥⌘A turns awake on, the lid closes, and 1h 50m later the migration is done and the tests pass](https://cdn.untitled.garden/media/awake/films/hero.webp)
+![Claude Code starts a long migration; ⌃⌥⌘A keeps the Mac awake, the lid closes, and the agent keeps working until it is done](https://cdn.untitled.garden/media/awake/films/hero.webp)
 
 Every assertion-based tool (caffeinate, KeepingYouAwake, Lungo) dies the moment you close the lid, by design. Apple's own clamshell mode needs AC power plus an external display plus an input device. awake covers the case none of them do: a laptop on battery, lid shut, still working.
 

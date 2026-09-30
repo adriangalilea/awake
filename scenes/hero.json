@@ -27,8 +27,33 @@
     },
     {
       "author" : true,
-      "kind" : "history",
-      "text" : "Migrate billing to the v2 API and run the whole test suite."
+      "kind" : "prompt",
+      "text" : "Migrate billing to the v2 API and get the whole test suite green."
+    },
+    {
+      "author" : true,
+      "kind" : "say",
+      "text" : "On it. This touches every billing module, so it will take a while."
+    },
+    {
+      "arg" : "src/billing/client.ts",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "Read 412 lines"
+      ],
+      "text" : "Read"
+    },
+    {
+      "arg" : "rg -l 'api/v1' src",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "src/billing/client.ts",
+        "src/billing/invoices.ts",
+        "src/billing/refunds.ts"
+      ],
+      "text" : "Bash"
     },
     {
       "author" : true,
@@ -38,7 +63,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Claude Code is migrating billing. It needs hours."
+      "text" : "Your agent has hours of work ahead."
     },
     {
       "author" : true,
@@ -53,7 +78,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Press ⌃⌥⌘A: the cup fills, awake is on."
+      "text" : "Press ⌃⌥⌘A to keep your Mac awake."
     },
     {
       "author" : true,
@@ -82,7 +107,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Close the lid. The Mac stays awake."
+      "text" : "Close the lid and walk away."
     },
     {
       "arg" : "src/billing/client.ts",
@@ -103,6 +128,33 @@
       "text" : "Update"
     },
     {
+      "arg" : "src/billing/refunds.ts",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "Updated src/billing/refunds.ts with 37 additions and 22 removals"
+      ],
+      "text" : "Update"
+    },
+    {
+      "arg" : "npm test",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "1,281 passed, 3 failed"
+      ],
+      "text" : "Bash"
+    },
+    {
+      "arg" : "src/billing/refunds.ts",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "Updated src/billing/refunds.ts with 6 additions and 2 removals"
+      ],
+      "text" : "Update"
+    },
+    {
       "arg" : "npm test",
       "author" : true,
       "kind" : "tool",
@@ -110,6 +162,11 @@
         "1,284 passed, 0 failed"
       ],
       "text" : "Bash"
+    },
+    {
+      "author" : true,
+      "kind" : "done",
+      "text" : "Billing is on the v2 API and all 1,284 tests pass."
     },
     {
       "author" : true,
@@ -126,7 +183,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Open it 1h 50m later: migrated, 1,284 tests pass."
+      "text" : "It kept working the whole time."
     }
   ]
 }

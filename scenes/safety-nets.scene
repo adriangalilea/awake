@@ -4,7 +4,7 @@ clock 22:10 · battery 41 · floor 15
 
 key
 lid close
-caption "awake is on, the lid shuts, the Mac is forgotten in a bag."
+caption "Forgot it was on, lid shut, in a bag?"
 time +3h05m · battery 15
-caption "At 15% battery, awake ends every claim and the Mac sleeps."
+caption "It lets the Mac sleep before the battery runs out."
 lid open

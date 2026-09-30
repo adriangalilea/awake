@@ -3,9 +3,9 @@
 clock 14:30 · battery 88 · floor 15
 
 $ awake 2h
-caption "awake 2h: two hours awake, even with the lid closed."
+caption "Give it a time, and it holds, lid closed included."
 lid close
 time +1h10m · battery 71
 lid open
 $ awake status
-caption "Open it 1h 10m later: awake status says 50 minutes left."
+caption "Ask it any time how long is left."

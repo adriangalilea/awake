@@ -6,11 +6,11 @@ agent codex ~/invoices
 agent prompt "Refactor the invoice pipeline to stream, then run the tests."
 agent say "This will take a while. Asking awake to keep the Mac up, lid closed included."
 agent run awake -w 4127 --lid
-caption "Codex asks to keep working with the lid closed."
+caption "Agents can ask to keep working with the lid closed."
 open menu
 hover "Allow while it runs"
 click "Allow while it runs"
-caption "You allow it, once."
+caption "Only you can allow it."
 agent work "Refactoring the invoice pipeline"
 lid close
 time +2h14m · battery 38
@@ -19,4 +19,4 @@ agent tool Bash "npm test" "1,284 passed, 0 failed"
 agent done "Done: the pipeline streams, all 1,284 tests pass."
 exit 4127
 lid open
-caption "Codex finished; awake let the Mac sleep."
+caption "When the work is done, your Mac sleeps again."
