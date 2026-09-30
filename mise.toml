@@ -81,26 +81,27 @@ if [ -d "$garden/apps/garden" ]; then set -- "$@" --out "$garden/apps/garden/com
 description = "The studio loop: recompile a scene on every save (open localhost:3100/macos or the garden)"
 run = "WATCH=1 mise run scene"
 
-# The films. Each scene is filmed on a MacBook, frame by frame, by the ui repo's
-# capture bench (the same component the garden plays live): an animated WebP, which a
-# README shows as an <img> and GitHub plays inline, and an mp4 for posts. Films are
-# never committed: they land in dist/films and go to the garden's CDN under stable
-# names (cdn.untitled.garden/media/awake/films/<scene>.webp, five-minute cache), so
-# the README's links survive every re-film. Needs ui's dev server (`mise dev` there)
-# and the garden checkout's R2 env; FILM=<scene> films one.
+# The films. Each scene is filmed on a MacBook by ui's `scripts/macos-film.ts` (the
+# same component the garden plays live, bundled on the spot, no server needed;
+# faster than real time: frames drawn in parallel, only distinct ones photographed):
+# an animated WebP, which a README shows as an <img> and GitHub plays inline, and an
+# mp4 for posts. Films are never committed: they land in dist/films and go to the
+# garden's CDN under stable names (cdn.untitled.garden/media/awake/films/<scene>.webp,
+# five-minute cache), so the README's links survive every re-film. Needs the ui and
+# garden checkouts (UI, GARDEN override); FILM=<scene> films one.
 [tasks.film]
 description = "Film the scenes (WebP + mp4) and publish them to cdn.untitled.garden/media/awake/films/"
 depends = ["scene"]
 run = '''
 ui="${UI:-$HOME/Developer/ui}"
 garden="${GARDEN:-$HOME/Developer/untitled}"
-test -f "$ui/scripts/macos-capture.ts" || { echo "no ui checkout at $ui (UI overrides)"; exit 1; }
+test -f "$ui/scripts/macos-film.ts" || { echo "no ui checkout at $ui (UI overrides)"; exit 1; }
 test -d "$garden/tools/release" || { echo "no garden checkout at $garden (GARDEN overrides)"; exit 1; }
 mkdir -p dist/films
 for s in scenes/${FILM:-*}.scene; do
   n=$(basename "$s" .scene)
-  (cd "$ui" && bun scripts/macos-capture.ts "awake/$n" --device macbook --accent "#e7a13c" \
-    --out "$OLDPWD/dist/films/$n.webp" --out "$OLDPWD/dist/films/$n.mp4")
+  bun "$ui/scripts/macos-film.ts" "scenes/$n.json" --device macbook --accent "#e7a13c" \
+    --out "dist/films/$n.webp" --out "dist/films/$n.mp4"
 done
 pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FILM:-*}.webp "$PWD"/dist/films/${FILM:-*}.mp4
 '''
