@@ -32,34 +32,13 @@
     },
     {
       "author" : true,
-      "delay" : 5000,
-      "kind" : "say",
-      "text" : "On it. This touches every billing module, so it will take a while."
-    },
-    {
-      "arg" : "src/billing/client.ts",
-      "author" : true,
-      "kind" : "tool",
-      "lines" : [
-        "Read 412 lines"
-      ],
-      "text" : "Read"
-    },
-    {
-      "arg" : "rg -l 'api/v1' src",
-      "author" : true,
-      "kind" : "tool",
-      "lines" : [
-        "src/billing/client.ts",
-        "src/billing/invoices.ts",
-        "src/billing/refunds.ts"
-      ],
-      "text" : "Bash"
-    },
-    {
-      "author" : true,
       "kind" : "caption",
       "text" : "Your agent has hours of work ahead."
+    },
+    {
+      "author" : true,
+      "kind" : "say",
+      "text" : "On it. This touches every billing module, so it will take a while."
     },
     {
       "author" : true,
@@ -104,6 +83,26 @@
       "author" : true,
       "kind" : "caption",
       "text" : "Close the lid and walk away."
+    },
+    {
+      "arg" : "src/billing/client.ts",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "Read 412 lines"
+      ],
+      "text" : "Read"
+    },
+    {
+      "arg" : "rg -l 'api/v1' src",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "src/billing/client.ts",
+        "src/billing/invoices.ts",
+        "src/billing/refunds.ts"
+      ],
+      "text" : "Bash"
     },
     {
       "arg" : "src/billing/client.ts",
@@ -179,7 +178,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "It kept working the whole time."
+      "text" : "The lid was shut for 1h 50m, and your agent finished the job."
     }
   ]
 }
