@@ -20,6 +20,22 @@
       "tooltip" : "awake: off, Mac sleeps normally"
     },
     {
+      "arg" : "~/billing",
+      "author" : true,
+      "kind" : "agent",
+      "text" : "claude"
+    },
+    {
+      "author" : true,
+      "kind" : "history",
+      "text" : "Migrate billing to the v2 API and run the whole test suite."
+    },
+    {
+      "author" : true,
+      "kind" : "work",
+      "text" : "Migrating billing to the v2 API"
+    },
+    {
       "author" : true,
       "keys" : "⌃⌥⌘A",
       "kind" : "key"

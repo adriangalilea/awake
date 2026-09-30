@@ -25,6 +25,10 @@ struct ScriptError: Error {
 ///   menu     open menu · hover "Title" · click "Title" · close menu
 ///   gestures key (the toggle chord) · right-click
 ///   stage    caption "text" · wait 1200
+///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
+///            "sent before the story" · agent prompt "typed now" · agent say "…" ·
+///            agent run awake -w 4127 --lid (a tool call awake answers for real) ·
+///            agent work "Refactoring the pipeline" · agent done "…"
 /// Show, then tell: a caption goes AFTER the step it explains, so the viewer sees
 /// the thing happen and then reads what it was. Pauses are rarely needed: the player
 /// waits for everything a step put on screen to be read before the next one.
@@ -131,6 +135,8 @@ final class Player {
             var s = Step(.caption)
             s.text = try quoted(rest)
             emit(s, author: true)
+        case "agent":
+            try agent(rest)
         case "wait":
             guard let ms = Int(rest) else { throw fail("'wait <ms>'") }
             pendingDelay = (pendingDelay ?? 0) + ms
@@ -140,17 +146,29 @@ final class Player {
     }
 
     private func command(_ text: String, expectFailure: Bool) throws {
+        var s = Step(.command)
+        s.text = text
+        emit(s, author: true)
+        for (line, muted) in try run(text, expectFailure: expectFailure) {
+            var o = Step(muted ? .muted : .output)
+            o.text = line
+            emit(o, author: false)
+        }
+    }
+
+    /// `awake …` or `asleep …` through the real CLI against the real engine: the
+    /// lines a terminal shows (muted when every span is), a failure included as the
+    /// `awake: …` line it prints.
+    private func run(_ text: String, expectFailure: Bool) throws -> [(String, Bool)] {
         let argv = try shellWords(text)
         guard let exe = argv.first, exe == "awake" || exe == "asleep" else {
             throw fail("only awake and asleep run in a scene")
         }
-        var s = Step(.command)
-        s.text = text
-        emit(s, author: true)
         let host = CLI.Host(
             now: world.now,
             process: { [world] pid in world.processes[pid].map { ($0.started, $0.name) } },
             executable: { _ in true })
+        var lines: [(String, Bool)] = []
         let failure: String?
         switch CLI.parse(Array(argv.dropFirst()), asleep: exe == "asleep", host: host) {
         case .failure(let e):
@@ -158,21 +176,49 @@ final class Player {
         case .success(let verb):
             let out = CLI.output(verb, machine.serve(verb.command), now: world.now, running: nil)
             failure = out.failure
-            for l in out.lines {
-                var o = Step(l.allSatisfy { $0.tone == .muted } ? .muted : .output)
-                o.text = l.map(\.text).joined()
-                emit(o, author: false)
+            lines = out.lines.map {
+                ($0.map(\.text).joined(), $0.allSatisfy { $0.tone == .muted })
             }
         }
         if let failure {
             guard expectFailure else {
                 throw fail("`\(text)` failed: \(failure) (write $! if that is the point)")
             }
-            var o = Step(.output)
-            o.text = "awake: \(failure)"
-            emit(o, author: false)
+            lines.append(("awake: \(failure)", false))
         } else if expectFailure {
             throw fail("`\(text)` succeeded, but $! says it should fail")
+        }
+        return lines
+    }
+
+    /// A coding agent in the terminal. Its words are the story's; the one thing it
+    /// runs through awake (`agent run awake …`) is awake's, answered by the engine.
+    private func agent(_ text: String) throws {
+        let words = text.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = words.count > 1 ? words[1] : ""
+        switch words[0] {
+        case "claude", "codex":
+            var s = Step(.agent)
+            s.text = words[0]
+            s.arg = rest.isEmpty ? "~" : rest
+            emit(s, author: true)
+        case "history", "prompt", "say", "work", "done":
+            let kinds: [String: Step.Kind] = [
+                "history": .history, "prompt": .prompt, "say": .say, "work": .work, "done": .done,
+            ]
+            var s = Step(kinds[words[0]]!)
+            s.text = try quoted(rest)
+            emit(s, author: true)
+        case "run":
+            var s = Step(.tool)
+            s.text = "Bash"
+            s.arg = rest
+            s.lines = try run(rest, expectFailure: false).map(\.0)
+            emit(s, author: true)
+        default:
+            throw fail(
+                "agent claude|codex [cwd] · agent history|prompt|say|work|done \"text\" · agent run awake …"
+            )
         }
     }
 

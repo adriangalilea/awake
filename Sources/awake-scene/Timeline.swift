@@ -29,11 +29,16 @@ struct Step: Encodable {
     var keys: String?
     /// world
     var world: WorldState?
+    /// agent (its working directory) · tool (its argument)
+    var arg: String?
+    /// tool: what came back, one line each
+    var lines: [String]?
 
     enum Kind: String, Encodable {
         case world, glyph, command, output, muted, menu, close, hover, press, key
         case rightClick = "right-click"
         case banner, caption
+        case agent, history, prompt, say, tool, work, done
     }
 
     init(_ kind: Kind, delay: Int? = nil) {

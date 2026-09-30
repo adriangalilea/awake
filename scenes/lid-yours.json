@@ -32,31 +32,41 @@
       }
     },
     {
+      "arg" : "~/invoices",
       "author" : true,
-      "kind" : "command",
-      "text" : "awake -w 4127 --lid"
+      "kind" : "agent",
+      "text" : "codex"
     },
     {
-      "kind" : "output",
-      "text" : "☕ awake · claude · while it runs (pid 4127) · asks lid"
+      "author" : true,
+      "kind" : "prompt",
+      "text" : "Refactor the invoice pipeline to stream, then run the tests."
     },
     {
-      "kind" : "muted",
-      "text" : "   battery 64% · floor 15%"
+      "author" : true,
+      "kind" : "say",
+      "text" : "This will take a while. Asking awake to keep the Mac up, lid closed included."
     },
     {
-      "kind" : "output",
-      "text" : "   ? lid asked · grant lid-closed survival with `awake allow`, dismiss with `awake deny`"
+      "arg" : "awake -w 4127 --lid",
+      "author" : true,
+      "kind" : "tool",
+      "lines" : [
+        "☕ awake · codex · while it runs (pid 4127) · asks lid",
+        "   battery 64% · floor 15%",
+        "   ? lid asked · grant lid-closed survival with `awake allow`, dismiss with `awake deny`"
+      ],
+      "text" : "Bash"
     },
     {
       "glyph" : "ask",
       "kind" : "glyph",
-      "tooltip" : "awake: claude · while it runs (pid 4127) · asks lid"
+      "tooltip" : "awake: codex · while it runs (pid 4127) · asks lid"
     },
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "claude asks to keep working with the lid closed."
+      "text" : "Codex asks to keep working with the lid closed."
     },
     {
       "author" : true,
@@ -64,7 +74,7 @@
       "rows" : [
         {
           "disabled" : true,
-          "title" : "Awake · claude · while it runs · asks lid"
+          "title" : "Awake · codex · while it runs · asks lid"
         },
         {
           "submenu" : [
@@ -81,7 +91,7 @@
               "title" : "End claim"
             }
           ],
-          "title" : "claude · while it runs · asks lid"
+          "title" : "codex · while it runs · asks lid"
         },
         {
           "disabled" : true,
@@ -92,7 +102,7 @@
         },
         {
           "disabled" : true,
-          "title" : "claude asks: survive lid close"
+          "title" : "codex asks: survive lid close"
         },
         {
           "title" : "Allow while it runs"
@@ -186,12 +196,17 @@
     {
       "glyph" : "lid",
       "kind" : "glyph",
-      "tooltip" : "awake: claude · while it runs (pid 4127) · lid granted"
+      "tooltip" : "awake: codex · while it runs (pid 4127) · lid granted"
     },
     {
       "author" : true,
       "kind" : "caption",
       "text" : "You allow it, once."
+    },
+    {
+      "author" : true,
+      "kind" : "work",
+      "text" : "Refactoring the invoice pipeline"
     },
     {
       "author" : true,
@@ -219,6 +234,11 @@
     },
     {
       "author" : true,
+      "kind" : "done",
+      "text" : "Done: 14 files changed, all 1,284 tests pass."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -231,7 +251,7 @@
     },
     {
       "kind" : "banner",
-      "text" : "claude (pid 4127) exited. Sleep restored."
+      "text" : "codex (pid 4127) exited. Sleep restored."
     },
     {
       "glyph" : "off",
@@ -252,7 +272,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "When claude finishes, the Mac sleeps."
+      "text" : "When Codex finishes, the Mac sleeps."
     },
     {
       "author" : true,
