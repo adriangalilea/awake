@@ -2,6 +2,8 @@
 
 Keep a Mac awake, **lid closed included**. One state machine, a menu bar cup and a CLI on top of it.
 
+![A coding agent asks awake to survive lid close; you allow it from the menu, close the lid, and the Mac sleeps when the agent is done](https://cdn.untitled.garden/media/awake/films/lid-yours.webp)
+
 Every assertion-based tool (caffeinate, KeepingYouAwake, Lungo) dies the moment you close the lid, by design. Apple's own clamshell mode needs AC power plus an external display plus an input device. awake covers the case none of them do: a laptop on battery, lid shut, still working.
 
 ```
@@ -109,7 +111,11 @@ mise check           # format + compile, the fast gate
 mise run install     # build + install + restart the daemon
 mise notes           # draft notes/<version>.md from the commits
 mise run release     # signed, notarized, stapled dmg → tag → GitHub Release → garden → cask
+mise scene           # compile scenes/*.scene into the timelines the web plays
+mise film            # film each scene (WebP + mp4) and publish it to the CDN
 ```
+
+The films above are not screen recordings. Each `scenes/*.scene` is a short story (the lid closes, the battery drops, you open the menu) that `awake-scene` plays through awake's real engine against a scripted Mac. Every menu row, terminal line and banner in them is what awake itself produces, and a scene that clicks a row the menu no longer has fails to compile.
 
 Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect notary key, neither of which belongs in CI, so CI only runs `mise check`. Both live in the keychain, nothing on disk and nothing in this repo. Set the notary profile up once:
 
