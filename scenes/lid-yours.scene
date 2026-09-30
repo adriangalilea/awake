@@ -1,7 +1,10 @@
-# A coding agent asks awake to keep working with the lid closed. You allow it once;
-# it works through the night behind the shut lid, and when it is done the Mac sleeps.
+# One command teaches the agents awake's skill; then a coding agent, using it, asks
+# awake to keep working with the lid closed. You allow it once; it works through the
+# night behind the shut lid, and when it is done the Mac sleeps.
 clock 21:04 · battery 64 · floor 15
 process 4127 codex
+$ awake skill install
+caption "One command teaches your agents to use awake."
 agent codex ~/invoices
 agent prompt "Refactor the invoice pipeline to stream, then run the tests."
 agent say "This will take a while. Asking awake to keep the Mac up, lid closed included."

@@ -32,6 +32,24 @@
       }
     },
     {
+      "author" : true,
+      "kind" : "command",
+      "text" : "awake skill install"
+    },
+    {
+      "kind" : "output",
+      "text" : "Claude Code: installed at ~/.claude/skills/awake"
+    },
+    {
+      "kind" : "output",
+      "text" : "Codex: installed at ~/.codex/skills/awake"
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "One command teaches your agents to use awake."
+    },
+    {
       "arg" : "~/invoices",
       "author" : true,
       "kind" : "agent",

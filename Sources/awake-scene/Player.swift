@@ -175,6 +175,15 @@ final class Player {
         guard let exe = argv.first, exe == "awake" || exe == "asleep" else {
             throw fail("only awake and asleep run in a scene")
         }
+        // `awake skill install` links files, IO the scripted Mac does not model: it is a
+        // Mac with both agents on it, and the words are the CLI's own.
+        if argv.dropFirst().first == "skill" {
+            guard Array(argv.dropFirst()) == ["skill", "install"] else {
+                throw fail("a scene plays `awake skill install` only")
+            }
+            return [("Claude Code", "~/.claude/skills/awake"), ("Codex", "~/.codex/skills/awake")]
+                .map { (SkillWords.line($0, .installed($1)), false) }
+        }
         let host = CLI.Host(
             now: world.now,
             process: { [world] pid in world.processes[pid].map { ($0.started, $0.name) } },

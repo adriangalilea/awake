@@ -52,19 +52,24 @@ enum Skill {
         FileManager.default.fileExists(atPath: h.root.path)
     }
 
+    /// A path as a person reads it: `~/.claude/skills/awake`.
+    private static func shown(_ url: URL) -> String {
+        (url.path as NSString).abbreviatingWithTildeInPath
+    }
+
     static func status() {
         for h in homes {
-            let state: String
+            let state: SkillWords.State
             if !agentPresent(h) {
-                state = "not on this Mac"
+                state = .notOnMac
             } else if let to = target(h.link) {
-                state = to == bundled?.path ? "installed" : "linked to \(to)"
+                state = to == bundled?.path ? .installed(shown(h.link)) : .linkedElsewhere(to)
             } else if FileManager.default.fileExists(atPath: h.link.path) {
-                state = "a folder of your own at \(h.link.path)"
+                state = .ownFolder(shown(h.link))
             } else {
-                state = "not installed (awake skill install)"
+                state = .notInstalled
             }
-            print("\(h.agent): \(state)")
+            print(SkillWords.line(h.agent, state))
         }
     }
 
@@ -76,20 +81,20 @@ enum Skill {
         var linked = 0
         for h in homes {
             guard agentPresent(h) else {
-                print("\(h.agent): not on this Mac, skipped")
+                print(SkillWords.line(h.agent, .skipped))
                 continue
             }
             if target(h.link) != nil {
                 try? fm.removeItem(at: h.link)
             } else if fm.fileExists(atPath: h.link.path) {
-                print("\(h.agent): \(h.link.path) is a folder of your own, left as it is")
+                print(SkillWords.line(h.agent, .ownFolder(shown(h.link))))
                 continue
             }
             do {
                 try fm.createDirectory(
                     at: h.link.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try fm.createSymbolicLink(at: h.link, withDestinationURL: skill)
-                print("\(h.agent): installed at \(h.link.path)")
+                print(SkillWords.line(h.agent, .installed(shown(h.link))))
                 linked += 1
             } catch {
                 Client.die(
@@ -103,7 +108,7 @@ enum Skill {
         for h in homes {
             guard target(h.link) != nil else { continue }
             try? FileManager.default.removeItem(at: h.link)
-            print("\(h.agent): removed \(h.link.path)")
+            print(SkillWords.line(h.agent, .removed(shown(h.link))))
         }
     }
 
