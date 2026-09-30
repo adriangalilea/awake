@@ -57,8 +57,7 @@
     },
     {
       "author" : true,
-      "kind" : "work",
-      "text" : "Migrating billing to the v2 API"
+      "kind" : "work"
     },
     {
       "author" : true,

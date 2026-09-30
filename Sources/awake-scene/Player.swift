@@ -28,7 +28,7 @@ struct ScriptError: Error {
 ///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
 ///            "sent before the story" · agent prompt "typed now" · agent say "…" ·
 ///            agent run awake -w 4127 --lid (a tool call awake answers for real) ·
-///            agent work "Refactoring the pipeline" · agent done "…" ·
+///            agent work (it starts working; the CLI words that line) · agent done "…" ·
 ///            agent tool Update "src/x.ts" "Updated with 40 additions" (its own work)
 ///            Agent steps written while the lid is shut happen in the dark: they are
 ///            read, and marked as new, when it opens. Show what got done.
@@ -205,9 +205,16 @@ final class Player {
             s.text = words[0]
             s.arg = rest.isEmpty ? "~" : rest
             emit(s, author: true)
-        case "history", "prompt", "say", "work", "done":
+        case "work":
+            // The working line's words are the CLI's own (Claude Code's playful verbs,
+            // Codex's "Working"), drawn by its skin, never the script's.
+            guard rest.isEmpty else {
+                throw fail("agent work takes no text: the CLI words its own working line")
+            }
+            emit(Step(.work), author: true)
+        case "history", "prompt", "say", "done":
             let kinds: [String: Step.Kind] = [
-                "history": .history, "prompt": .prompt, "say": .say, "work": .work, "done": .done,
+                "history": .history, "prompt": .prompt, "say": .say, "done": .done,
             ]
             var s = Step(kinds[words[0]]!)
             s.text = try quoted(rest)
@@ -229,7 +236,7 @@ final class Player {
             emit(s, author: true)
         default:
             throw fail(
-                "agent claude|codex [cwd] · agent history|prompt|say|work|done \"text\" · agent tool Name \"arg\" \"result\"… · agent run awake …"
+                "agent claude|codex [cwd] · agent history|prompt|say|done \"text\" · agent work · agent tool Name \"arg\" \"result\"… · agent run awake …"
             )
         }
     }

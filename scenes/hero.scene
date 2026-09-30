@@ -6,7 +6,7 @@ agent prompt "Migrate billing to the v2 API. Make no mistakes."
 agent say "On it. This touches every billing module, so it will take a while."
 agent tool Read "src/billing/client.ts" "Read 412 lines"
 agent tool Bash "rg -l 'api/v1' src" "src/billing/client.ts" "src/billing/invoices.ts" "src/billing/refunds.ts"
-agent work "Migrating billing to the v2 API"
+agent work
 caption "Your agent has hours of work ahead."
 
 key
