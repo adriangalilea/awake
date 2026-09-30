@@ -53,10 +53,56 @@ description = "swift-format lint, advisory (format-clean is the gate, not lint t
 run = "xcrun swift-format lint --recursive Sources/ scripts/"
 
 [tasks.check]
-description = "format + compile everything, debug — the FAST typecheck (must be 0 warnings)"
+description = "format + compile everything, debug — the FAST typecheck (must be 0 warnings); recompiles the scenes, so a menu change that breaks one fails here"
 run = '''
 mise run format
 scripts/locked.sh swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
+.build/debug/awake-scene scenes/*.scene > /dev/null || .build/debug/awake-scene scenes/*.scene
+'''
+
+# THE SHOWCASE. scenes/*.scene are stories played through the real engine against a
+# scripted Mac (Sources/awake-scene); each compiles to a timeline @ag/macos-session
+# plays on the web, and art.json holds the glyphs and icon drawn by the app's own
+# code. The timelines land in this repo (committed, CI checks they are current) and,
+# when the checkouts exist, in the ui studio and the garden (UI, GARDEN override).
+[tasks.scene]
+description = "Compile scenes/*.scene into web timelines + art.json (here, the ui studio, the garden)"
+run = '''
+scripts/locked.sh swift build --product awake-scene > /dev/null
+set -- --out scenes
+ui="${UI:-$HOME/Developer/ui}"
+garden="${GARDEN:-$HOME/Developer/untitled}"
+if [ -d "$ui/public" ]; then set -- "$@" --out "$ui/public/macos/awake"; fi
+if [ -d "$garden/apps/garden" ]; then set -- "$@" --out "$garden/apps/garden/components/scenes/awake"; fi
+.build/debug/awake-scene scenes/*.scene --art "$@" ${WATCH:+--watch}
+'''
+
+[tasks."scene:watch"]
+description = "The studio loop: recompile a scene on every save (open localhost:3100/macos or the garden)"
+run = "WATCH=1 mise run scene"
+
+# The films. Each scene is filmed on a MacBook, frame by frame, by the ui repo's
+# capture bench (the same component the garden plays live): an animated WebP, which a
+# README shows as an <img> and GitHub plays inline, and an mp4 for posts. Films are
+# never committed: they land in dist/films and go to the garden's CDN under stable
+# names (cdn.untitled.garden/media/awake/films/<scene>.webp, five-minute cache), so
+# the README's links survive every re-film. Needs ui's dev server (`mise dev` there)
+# and the garden checkout's R2 env; FILM=<scene> films one.
+[tasks.film]
+description = "Film the scenes (WebP + mp4) and publish them to cdn.untitled.garden/media/awake/films/"
+depends = ["scene"]
+run = '''
+ui="${UI:-$HOME/Developer/ui}"
+garden="${GARDEN:-$HOME/Developer/untitled}"
+test -f "$ui/scripts/macos-capture.ts" || { echo "no ui checkout at $ui (UI overrides)"; exit 1; }
+test -d "$garden/tools/release" || { echo "no garden checkout at $garden (GARDEN overrides)"; exit 1; }
+mkdir -p dist/films
+for s in scenes/${FILM:-*}.scene; do
+  n=$(basename "$s" .scene)
+  (cd "$ui" && bun scripts/macos-capture.ts "awake/$n" --device macbook --accent "#e7a13c" \
+    --out "$OLDPWD/dist/films/$n.webp" --out "$OLDPWD/dist/films/$n.mp4")
+done
+pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FILM:-*}.webp "$PWD"/dist/films/${FILM:-*}.mp4
 '''
 
 [tasks.icon]

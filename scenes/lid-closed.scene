@@ -1,0 +1,11 @@
+# Two hours awake, lid closed included: into the bag, still running, and still
+# counting down when it comes out.
+clock 14:30 · battery 88 · floor 15
+
+caption "two hours awake, lid closed included"
+$ awake 2h
+@900 lid close
+caption "into the bag, still running"
+@1400 time +1h10m · battery 71
+@1200 lid open
+$ awake status

@@ -1,0 +1,154 @@
+{
+  "app" : "awake",
+  "chord" : "⌃⌥⌘A",
+  "steps" : [
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 72,
+        "charging" : true,
+        "clock" : "10:12",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "caption",
+      "text" : "one chord keeps the Mac awake"
+    },
+    {
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: you · indefinite"
+    },
+    {
+      "kind" : "caption",
+      "text" : "the cup fills and burns: closing the lid won't sleep it"
+    },
+    {
+      "delay" : 1100,
+      "kind" : "menu",
+      "rows" : [
+        {
+          "disabled" : true,
+          "title" : "Awake · you · indefinite"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "End claim"
+            }
+          ],
+          "title" : "you · indefinite"
+        },
+        {
+          "disabled" : true,
+          "title" : "Battery 72% (AC) · floor 15%"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "chord" : "⌃⌥⌘A",
+          "title" : "End your session"
+        },
+        {
+          "title" : "Let it sleep"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "30 minutes"
+        },
+        {
+          "title" : "1 hour"
+        },
+        {
+          "title" : "2 hours"
+        },
+        {
+          "title" : "4 hours"
+        },
+        {
+          "title" : "8 hours"
+        },
+        {
+          "checked" : true,
+          "title" : "Indefinite"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Keep display on"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "Off"
+            },
+            {
+              "title" : "10%"
+            },
+            {
+              "checked" : true,
+              "title" : "15%"
+            },
+            {
+              "title" : "20%"
+            },
+            {
+              "title" : "30%"
+            },
+            {
+              "title" : "50%"
+            }
+          ],
+          "title" : "Battery floor"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Quit awake"
+        }
+      ]
+    },
+    {
+      "delay" : 700,
+      "kind" : "hover",
+      "path" : [
+        15
+      ]
+    },
+    {
+      "delay" : 1300,
+      "kind" : "close"
+    },
+    {
+      "kind" : "caption",
+      "text" : "the same chord lets it sleep again"
+    },
+    {
+      "delay" : 900,
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    }
+  ]
+}

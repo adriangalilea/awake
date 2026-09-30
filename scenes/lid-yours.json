@@ -1,0 +1,252 @@
+{
+  "app" : "awake",
+  "chord" : "⌃⌥⌘A",
+  "steps" : [
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 64,
+        "charging" : false,
+        "clock" : "21:04",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "caption",
+      "text" : "a long refactor starts, and claude asks awake to hold the Mac"
+    },
+    {
+      "kind" : "command",
+      "text" : "awake -w 4127 --lid"
+    },
+    {
+      "kind" : "output",
+      "text" : "☕ awake · claude · while it runs (pid 4127) · asks lid"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 64% · floor 15%"
+    },
+    {
+      "kind" : "output",
+      "text" : "   ? lid asked · grant lid-closed survival with `awake allow`, dismiss with `awake deny`"
+    },
+    {
+      "glyph" : "ask",
+      "kind" : "glyph",
+      "tooltip" : "awake: claude · while it runs (pid 4127) · asks lid"
+    },
+    {
+      "delay" : 900,
+      "kind" : "menu",
+      "rows" : [
+        {
+          "disabled" : true,
+          "title" : "Awake · claude · while it runs · asks lid"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "Allow lid-closed survival"
+            },
+            {
+              "title" : "Dismiss ask"
+            },
+            {
+              "separator" : true
+            },
+            {
+              "title" : "End claim"
+            }
+          ],
+          "title" : "claude · while it runs · asks lid"
+        },
+        {
+          "disabled" : true,
+          "title" : "Battery 64% · floor 15%"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "disabled" : true,
+          "title" : "claude asks: survive lid close"
+        },
+        {
+          "title" : "Allow while it runs"
+        },
+        {
+          "title" : "Ignore"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Let it sleep"
+        },
+        {
+          "title" : "End session"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "30 minutes"
+        },
+        {
+          "title" : "1 hour"
+        },
+        {
+          "title" : "2 hours"
+        },
+        {
+          "title" : "4 hours"
+        },
+        {
+          "title" : "8 hours"
+        },
+        {
+          "chord" : "⌃⌥⌘A",
+          "title" : "Indefinite"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Keep display on"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "Off"
+            },
+            {
+              "title" : "10%"
+            },
+            {
+              "checked" : true,
+              "title" : "15%"
+            },
+            {
+              "title" : "20%"
+            },
+            {
+              "title" : "30%"
+            },
+            {
+              "title" : "50%"
+            }
+          ],
+          "title" : "Battery floor"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Quit awake"
+        }
+      ]
+    },
+    {
+      "kind" : "hover",
+      "path" : [
+        4
+      ]
+    },
+    {
+      "delay" : 700,
+      "kind" : "press",
+      "path" : [
+        5
+      ]
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: claude · while it runs (pid 4127) · lid granted"
+    },
+    {
+      "kind" : "caption",
+      "text" : "you close the lid and leave"
+    },
+    {
+      "delay" : 900,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 64,
+        "charging" : false,
+        "clock" : "21:04",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "delay" : 1200,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 38,
+        "charging" : false,
+        "clock" : "23:18",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "caption",
+      "text" : "the refactor finishes"
+    },
+    {
+      "kind" : "banner",
+      "text" : "claude (pid 4127) exited. Sleep restored."
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : true,
+        "battery" : 38,
+        "charging" : false,
+        "clock" : "23:18",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "delay" : 1200,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 38,
+        "charging" : false,
+        "clock" : "23:18",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "kind" : "command",
+      "text" : "awake status"
+    },
+    {
+      "kind" : "output",
+      "text" : "💤 asleep · Mac sleeps normally"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 38% · floor 15%"
+    }
+  ]
+}

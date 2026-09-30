@@ -1,0 +1,201 @@
+{
+  "app" : "awake",
+  "chord" : "⌃⌥⌘A",
+  "steps" : [
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:10",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "caption",
+      "text" : "one chord holds the Mac awake, lid closed included"
+    },
+    {
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: you · indefinite"
+    },
+    {
+      "delay" : 1000,
+      "kind" : "menu",
+      "rows" : [
+        {
+          "disabled" : true,
+          "title" : "Awake · you · indefinite"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "End claim"
+            }
+          ],
+          "title" : "you · indefinite"
+        },
+        {
+          "disabled" : true,
+          "title" : "Battery 41% · floor 15%"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "chord" : "⌃⌥⌘A",
+          "title" : "End your session"
+        },
+        {
+          "title" : "Let it sleep"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "30 minutes"
+        },
+        {
+          "title" : "1 hour"
+        },
+        {
+          "title" : "2 hours"
+        },
+        {
+          "title" : "4 hours"
+        },
+        {
+          "title" : "8 hours"
+        },
+        {
+          "checked" : true,
+          "title" : "Indefinite"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Keep display on"
+        },
+        {
+          "submenu" : [
+            {
+              "title" : "Off"
+            },
+            {
+              "title" : "10%"
+            },
+            {
+              "checked" : true,
+              "title" : "15%"
+            },
+            {
+              "title" : "20%"
+            },
+            {
+              "title" : "30%"
+            },
+            {
+              "title" : "50%"
+            }
+          ],
+          "title" : "Battery floor"
+        },
+        {
+          "separator" : true
+        },
+        {
+          "title" : "Quit awake"
+        }
+      ]
+    },
+    {
+      "delay" : 1400,
+      "kind" : "close"
+    },
+    {
+      "kind" : "caption",
+      "text" : "you close the lid and forget it in a bag"
+    },
+    {
+      "delay" : 900,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:10",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "delay" : 1200,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 15,
+        "charging" : false,
+        "clock" : "01:15",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "banner",
+      "text" : "Battery at 15%. Sleep restored."
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : true,
+        "battery" : 15,
+        "charging" : false,
+        "clock" : "01:15",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "delay" : 1400,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 15,
+        "charging" : false,
+        "clock" : "01:15",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "kind" : "command",
+      "text" : "awake status"
+    },
+    {
+      "kind" : "output",
+      "text" : "💤 asleep · Mac sleeps normally"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 15% · floor 15%"
+    }
+  ]
+}

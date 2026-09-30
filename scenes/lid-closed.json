@@ -1,0 +1,95 @@
+{
+  "app" : "awake",
+  "chord" : "⌃⌥⌘A",
+  "steps" : [
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 88,
+        "charging" : false,
+        "clock" : "14:30",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "caption",
+      "text" : "two hours awake, lid closed included"
+    },
+    {
+      "kind" : "command",
+      "text" : "awake 2h"
+    },
+    {
+      "kind" : "output",
+      "text" : "☕ awake · you · 2h 0m left"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 88% · floor 15%"
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: you · 2h 0m left"
+    },
+    {
+      "delay" : 900,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 88,
+        "charging" : false,
+        "clock" : "14:30",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "caption",
+      "text" : "into the bag, still running"
+    },
+    {
+      "delay" : 1400,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 71,
+        "charging" : false,
+        "clock" : "15:40",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "delay" : 1200,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 71,
+        "charging" : false,
+        "clock" : "15:40",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "kind" : "command",
+      "text" : "awake status"
+    },
+    {
+      "kind" : "output",
+      "text" : "☕ awake · you · 50m left"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 71% · floor 15%"
+    }
+  ]
+}

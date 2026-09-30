@@ -1,0 +1,13 @@
+# One chord keeps the Mac awake. The cup in the menu bar says so, its menu holds
+# the rest, and the same chord lets it sleep again.
+clock 10:12 · battery 72 · power ac · floor 15
+
+caption "one chord keeps the Mac awake"
+key
+caption "the cup fills and burns: closing the lid won't sleep it"
+@1100 open menu
+@700 hover "Battery floor"
+@1300 close menu
+
+caption "the same chord lets it sleep again"
+@900 key
