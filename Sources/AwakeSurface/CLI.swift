@@ -8,7 +8,7 @@ import enum Grant.Notifications  // scoped: Grant's own Claim would shadow Awake
 /// two against a scripted machine, so its terminal shows what `awake` really prints.
 public enum CLI {
     public static let usage = """
-        awake: keep the Mac awake, lid closed included. One state machine, menu bar + CLI.
+        awake: close the lid, your Mac stays awake. One state machine, menu bar + CLI.
 
         The machine stays awake while ANY claim exists; claims coexist instead of
         replacing each other. Yours, an agent's process watch, a build's timer: each is

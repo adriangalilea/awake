@@ -1,6 +1,6 @@
 # awake
 
-Keep a Mac awake, **lid closed included**. One state machine, a menu bar cup and a CLI on top of it.
+**Close the lid. Your Mac stays awake.** One state machine, a menu bar cup and a CLI on top of it.
 
 ![Claude Code starts a long migration; ⌃⌥⌘A keeps the Mac awake, the lid closes, and the agent keeps working until it is done](https://cdn.untitled.garden/media/awake/films/hero.webp)
 
