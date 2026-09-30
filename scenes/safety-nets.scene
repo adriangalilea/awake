@@ -1,10 +1,17 @@
-# Held awake for the night and forgotten in a bag: the battery floor ends it with
-# charge to spare.
+# Held awake with the lid shut and forgotten in a bag. Heat is the danger in there:
+# at critical temperature awake gives up the lid, forced or not, and the Mac sleeps.
+# And if the bag stays cool, the battery floor ends it with charge to spare.
 clock 22:10 · battery 41 · floor 15
 
 key
 lid close
 caption "Forgot it was on, lid shut, in a bag?"
+time +25m · thermal critical
+caption "If it gets too hot, awake lets it sleep."
+lid open
+thermal nominal
+key
+lid close
 time +3h05m · battery 15
-caption "It lets the Mac sleep before the battery runs out."
+caption "If the battery runs low, it sleeps too."
 lid open

@@ -51,9 +51,92 @@
       "kind" : "world",
       "world" : {
         "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : true,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "banner",
+      "text" : "Critical heat: lid-closed survival ended (you), closing the lid sleeps it. Sleep restored."
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "kind" : "world",
+      "world" : {
+        "asleep" : true,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : true,
+        "lid" : "closed"
+      }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "If it gets too hot, awake lets it sleep."
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : true,
+        "lid" : "open"
+      }
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : false,
+        "lid" : "open"
+      }
+    },
+    {
+      "author" : true,
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: you · indefinite"
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:15",
+        "clock" : "01:40",
         "heat" : false,
         "lid" : "closed"
       }
@@ -73,7 +156,7 @@
         "asleep" : true,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:15",
+        "clock" : "01:40",
         "heat" : false,
         "lid" : "closed"
       }
@@ -81,7 +164,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "It lets the Mac sleep before the battery runs out."
+      "text" : "If the battery runs low, it sleeps too."
     },
     {
       "author" : true,
@@ -90,7 +173,7 @@
         "asleep" : false,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:15",
+        "clock" : "01:40",
         "heat" : false,
         "lid" : "open"
       }
