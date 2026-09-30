@@ -39,11 +39,13 @@ enum Agent {
 
     static func install() {
         removeUserAgentPlist()
-        if registered {
-            // Registered already, so this is a reinstall: restart into the image the
-            // bundle holds now. The SIGTERM parks the claims; startup re-arms them.
+        if registered, running {
+            // A reinstall: restart into the image the bundle holds now. The SIGTERM
+            // parks the claims; startup re-arms them. Only a running job: kickstart
+            // on a job launchd has given up on (its bundle deleted, a refused image)
+            // blocks forever; those fall through to the re-registration below.
             _ = AwakeKit.run("/bin/launchctl", ["kickstart", "-k", target])
-        } else {
+        } else if !registered {
             register()
         }
         // `enabled` is BTM's record, not launchd's. A job can be registered and
@@ -65,11 +67,13 @@ enum Agent {
         Notifier.launch(["--prime"])
     }
 
+    static var running: Bool {
+        AwakeKit.run("/bin/launchctl", ["print", target]).out.contains("\tstate = running")
+    }
+
     private static func waitRunning() -> Bool {
         for _ in 0..<20 {
-            if AwakeKit.run("/bin/launchctl", ["print", target]).out.contains("\tstate = running") {
-                return true
-            }
+            if running { return true }
             usleep(250_000)
         }
         return false
@@ -115,15 +119,12 @@ enum Agent {
         say("✓ agent unregistered (\(Paths.launchdLabel))")
     }
 
-    /// The daemon, its bundle deleted, removing its own registration. launchd kills
-    /// this process inside the call, so everything that must happen (sleep
-    /// restored, claims ended) happens before it.
-    static func unregisterSelf() {
-        do {
-            try service.unregister()
-        } catch {
-            log("self-unregister failed: \(error.localizedDescription)")
-        }
+    /// The daemon, its bundle deleted, taking itself out of launchd so KeepAlive stops
+    /// retrying a missing binary. launchd kills this process inside the call, so
+    /// everything that must happen (sleep restored, claims ended) happens before it.
+    /// BTM keeps its record (unregister needs the bundle); a reinstall reuses it.
+    static func bootoutSelf() {
+        _ = AwakeKit.run("/bin/launchctl", ["bootout", target])
     }
 
     /// A plist under our label in ~/Library/LaunchAgents is a second definition of

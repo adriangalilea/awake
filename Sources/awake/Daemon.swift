@@ -181,8 +181,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// reinstall) → park and exit: KeepAlive restarts into the new image and startup
     /// re-arms the claims. Gone two ticks in a row (an uninstall; a single absent tick
     /// is the instant an upgrade swaps bundles) → end every claim, which restores
-    /// sleep, then unregister: a deleted app leaves its registration behind, and
-    /// launchd would retry the missing binary forever. Nothing else is awake to do it
+    /// sleep, then bootout: a deleted app leaves its job loaded, and launchd would
+    /// retry the missing binary forever. Nothing else is awake to do it
     /// (cask steps are sandboxed; a Trash drag runs no hook at all).
     private func watchImage() {
         let (path, inode) = Self.image
@@ -191,9 +191,9 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             imageGoneTicks += 1
             log("executable missing at \(path) (\(imageGoneTicks)/2)")
             guard imageGoneTicks >= 2 else { return }
-            log("app uninstalled: ending every claim and unregistering the agent")
+            log("app uninstalled: ending every claim and leaving launchd")
             machine.endAll(.shutdown)
-            Agent.unregisterSelf()  // launchd kills this process inside the call
+            Agent.bootoutSelf()  // launchd kills this process inside the call
             exit(0)
         }
         imageGoneTicks = 0

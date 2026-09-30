@@ -15,7 +15,7 @@ enum Client {
     /// → kickstart -k, which also recovers a wedged daemon (alive but not accepting).
     static func send(_ cmd: Command) -> Reply {
         if let r = Wire.roundTrip(cmd) { return r }
-        if Agent.registered {
+        if Agent.registered, Agent.running {
             _ = AwakeKit.run(
                 "/bin/launchctl",
                 ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])

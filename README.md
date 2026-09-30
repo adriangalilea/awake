@@ -44,7 +44,7 @@ cd awake && mise run install     # needs mise (brew install mise); the verbs liv
 awake grant
 ```
 
-Either path installs the app and puts `awake` and `asleep` on your PATH. The daemon that owns the state machine is a launch agent the app registers itself (SMAppService, listed under Login Items), the first time you open awake or run any `awake` command. From then on it keeps itself current: after an upgrade it restarts into the new version, and if you delete the app it restores normal sleep and unregisters itself.
+Either path installs the app and puts `awake` and `asleep` on your PATH. The daemon that owns the state machine is a launch agent the app registers itself (SMAppService, listed under Login Items), the first time you open awake or run any `awake` command. From then on it keeps itself current: after an upgrade it restarts into the new version, and if you delete the app it restores normal sleep and stops itself.
 
 `awake grant` asks once, with the native authorization prompt, to install a sudoers rule scoped to exactly two commands:
 
