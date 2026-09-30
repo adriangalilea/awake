@@ -28,7 +28,7 @@
     {
       "author" : true,
       "kind" : "prompt",
-      "text" : "Migrate billing to the v2 API and get the whole test suite green."
+      "text" : "Migrate billing to the v2 API. Make no mistakes."
     },
     {
       "author" : true,
