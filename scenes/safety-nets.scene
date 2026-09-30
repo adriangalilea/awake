@@ -1,13 +1,10 @@
-# You hold the Mac awake for the night and forget it in a bag. The battery floor
-# ends the claim with charge to spare, and the Mac sleeps.
+# Held awake for the night and forgotten in a bag: the battery floor ends it with
+# charge to spare.
 clock 22:10 · battery 41 · floor 15
 
 key
-caption "You keep the Mac awake for the night."
 lid close
-caption "Then you forget it in a bag."
+caption "Forgotten in a bag."
 time +3h05m · battery 15
-caption "At 15%, the battery floor ends every claim and the Mac sleeps, with charge to spare."
+caption "At 15%, awake lets the Mac sleep."
 lid open
-caption "The banner says what happened."
-$ awake status

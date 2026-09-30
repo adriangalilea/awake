@@ -1,14 +1,13 @@
-# One chord keeps the Mac awake. The cup in the menu bar says so, its menu holds
-# the rest, and the same chord lets it sleep again.
+# One switch, three ways to throw it: the mouse, the chord, the terminal. Left-click
+# shows what is holding the Mac awake.
 clock 10:12 · battery 72 · power ac · floor 15
 
+right-click
+caption "Right-click the cup: awake."
 key
-caption "⌃⌥⌘A starts your session. The cup fills and burns: even a closed lid won't sleep the Mac."
+caption "⌃⌥⌘A: back to normal sleep."
+$ awake
+caption "The terminal throws the same switch."
 open menu
-caption "The menu says who is holding the Mac awake, and for how long."
-hover "Battery floor"
-caption "A battery floor ends every claim before the charge runs out."
+caption "Click it to see what holds the Mac awake."
 close menu
-
-key
-caption "The same chord ends your session, and the Mac sleeps as usual."

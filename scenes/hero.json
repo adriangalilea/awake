@@ -7,9 +7,9 @@
       "kind" : "world",
       "world" : {
         "asleep" : false,
-        "battery" : 88,
+        "battery" : 76,
         "charging" : false,
-        "clock" : "14:30",
+        "clock" : "22:40",
         "heat" : false,
         "lid" : "open"
       }
@@ -21,35 +21,27 @@
     },
     {
       "author" : true,
-      "kind" : "command",
-      "text" : "awake 2h"
-    },
-    {
-      "kind" : "output",
-      "text" : "☕ awake · you · 2h 0m left"
-    },
-    {
-      "kind" : "muted",
-      "text" : "   battery 88% · floor 15%"
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
     },
     {
       "glyph" : "lid",
       "kind" : "glyph",
-      "tooltip" : "awake: you · 2h 0m left"
+      "tooltip" : "awake: you · indefinite"
     },
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Two hours, lid closed included."
+      "text" : "One chord keeps the Mac awake."
     },
     {
       "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
-        "battery" : 88,
+        "battery" : 76,
         "charging" : false,
-        "clock" : "14:30",
+        "clock" : "22:40",
         "heat" : false,
         "lid" : "closed"
       }
@@ -59,42 +51,29 @@
       "kind" : "world",
       "world" : {
         "asleep" : false,
-        "battery" : 71,
+        "battery" : 58,
         "charging" : false,
-        "clock" : "15:40",
+        "clock" : "00:30",
         "heat" : false,
         "lid" : "closed"
       }
     },
     {
       "author" : true,
+      "kind" : "caption",
+      "text" : "Lid closed, still working."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
-        "battery" : 71,
+        "battery" : 58,
         "charging" : false,
-        "clock" : "15:40",
+        "clock" : "00:30",
         "heat" : false,
         "lid" : "open"
       }
-    },
-    {
-      "author" : true,
-      "kind" : "command",
-      "text" : "awake status"
-    },
-    {
-      "kind" : "output",
-      "text" : "☕ awake · you · 50m left"
-    },
-    {
-      "kind" : "muted",
-      "text" : "   battery 71% · floor 15%"
-    },
-    {
-      "author" : true,
-      "kind" : "caption",
-      "text" : "Fifty minutes left."
     }
   ]
 }

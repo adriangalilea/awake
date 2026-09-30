@@ -1,0 +1,9 @@
+# The value in one breath: turn awake on, close the lid, and the Mac keeps going.
+clock 22:40 · battery 76 · floor 15
+
+key
+caption "One chord keeps the Mac awake."
+lid close
+time +1h50m · battery 58
+caption "Lid closed, still working."
+lid open

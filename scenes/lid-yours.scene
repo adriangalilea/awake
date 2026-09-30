@@ -1,21 +1,16 @@
-# A coding agent asks to keep working with the lid closed. You allow it from the
-# menu, close the lid and leave; when the work ends, the Mac goes to sleep.
+# A coding agent asks to keep working with the lid closed. You allow it once; when
+# the work ends, the Mac sleeps on its own.
 clock 21:04 · battery 64 · floor 15
 process 4127 claude
 
 $ awake -w 4127 --lid
-caption "claude asks awake to keep the Mac up while it works, lid closed included."
+caption "claude asks to keep working with the lid closed."
 open menu
-caption "The question waits in the menu. Nothing changes until you answer it."
 hover "Allow while it runs"
 click "Allow while it runs"
-caption "The cup burns: while claude runs, closing the lid will not sleep the Mac."
-
+caption "You allow it, once."
 lid close
 time +2h14m · battery 38
-caption "Two hours later the lid is still shut, and the work goes on."
 exit 4127
-caption "The work ends. With nothing left holding it, the Mac goes to sleep."
+caption "When claude finishes, the Mac sleeps."
 lid open
-caption "The banner saying why is waiting when you come back."
-$ awake status

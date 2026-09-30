@@ -3,10 +3,9 @@
 clock 14:30 · battery 88 · floor 15
 
 $ awake 2h
-caption "Two hours awake, lid closed included."
+caption "Two hours, lid closed included."
 lid close
 time +1h10m · battery 71
-caption "In the bag, still running."
 lid open
 $ awake status
-caption "Fifty minutes left, right where you left it."
+caption "Fifty minutes left."

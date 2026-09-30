@@ -21,8 +21,7 @@
     },
     {
       "author" : true,
-      "keys" : "⌃⌥⌘A",
-      "kind" : "key"
+      "kind" : "right-click"
     },
     {
       "glyph" : "lid",
@@ -32,7 +31,45 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "⌃⌥⌘A starts your session. The cup fills and burns: even a closed lid won't sleep the Mac."
+      "text" : "Right-click the cup: awake."
+    },
+    {
+      "author" : true,
+      "keys" : "⌃⌥⌘A",
+      "kind" : "key"
+    },
+    {
+      "glyph" : "off",
+      "kind" : "glyph",
+      "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "⌃⌥⌘A: back to normal sleep."
+    },
+    {
+      "author" : true,
+      "kind" : "command",
+      "text" : "awake"
+    },
+    {
+      "kind" : "output",
+      "text" : "☕ awake · you · indefinite"
+    },
+    {
+      "kind" : "muted",
+      "text" : "   battery 72% (AC) · floor 15%"
+    },
+    {
+      "glyph" : "lid",
+      "kind" : "glyph",
+      "tooltip" : "awake: you · indefinite"
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The terminal throws the same switch."
     },
     {
       "author" : true,
@@ -127,38 +164,11 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "The menu says who is holding the Mac awake, and for how long."
-    },
-    {
-      "author" : true,
-      "kind" : "hover",
-      "path" : [
-        15
-      ]
-    },
-    {
-      "author" : true,
-      "kind" : "caption",
-      "text" : "A battery floor ends every claim before the charge runs out."
+      "text" : "Click it to see what holds the Mac awake."
     },
     {
       "author" : true,
       "kind" : "close"
-    },
-    {
-      "author" : true,
-      "keys" : "⌃⌥⌘A",
-      "kind" : "key"
-    },
-    {
-      "glyph" : "off",
-      "kind" : "glyph",
-      "tooltip" : "awake: off, Mac sleeps normally"
-    },
-    {
-      "author" : true,
-      "kind" : "caption",
-      "text" : "The same chord ends your session, and the Mac sleeps as usual."
     }
   ]
 }

@@ -31,11 +31,6 @@
     },
     {
       "author" : true,
-      "kind" : "caption",
-      "text" : "You keep the Mac awake for the night."
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -49,7 +44,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Then you forget it in a bag."
+      "text" : "Forgotten in a bag."
     },
     {
       "author" : true,
@@ -86,7 +81,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "At 15%, the battery floor ends every claim and the Mac sleeps, with charge to spare."
+      "text" : "At 15%, awake lets the Mac sleep."
     },
     {
       "author" : true,
@@ -99,24 +94,6 @@
         "heat" : false,
         "lid" : "open"
       }
-    },
-    {
-      "author" : true,
-      "kind" : "caption",
-      "text" : "The banner says what happened."
-    },
-    {
-      "author" : true,
-      "kind" : "command",
-      "text" : "awake status"
-    },
-    {
-      "kind" : "output",
-      "text" : "💤 asleep · Mac sleeps normally"
-    },
-    {
-      "kind" : "muted",
-      "text" : "   battery 15% · floor 15%"
     }
   ]
 }
