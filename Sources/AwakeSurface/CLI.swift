@@ -35,6 +35,7 @@ public enum CLI {
           awake notify [CMD]    out-of-band hook for closed-lid ends (--clear removes)
           awake updates [on|off] the daily version check (one GET, counts as an active install)
           awake hotkey [COMBO]  show/remap the global toggle (--reset for default)
+          awake skill [install|remove]  the agent skill, for Claude Code and Codex
           awake grant           install the scoped sudoers grant (once)
           awake grant --remove  remove it · --force reinstalls over an existing rule
           awake agent install   register the agent for THIS bundle (or restart it into it)

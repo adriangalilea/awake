@@ -172,6 +172,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard imageGoneTicks >= 2 else { return }
             log("app uninstalled: ending every claim and leaving launchd")
             machine.endAll(.shutdown)
+            Skill.unlink(into: Bundle.main.bundlePath)
             Agent.bootoutSelf()  // launchd kills this process inside the call
             exit(0)
         }

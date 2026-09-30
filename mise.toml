@@ -18,7 +18,7 @@
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION = "0.8.3"
+VERSION = "0.9.0"
 LABEL = "garden.untitled.awake"
 # The .app lives in ~/Applications; the CLI is a symlink into the bundle so
 # daemon and CLI stay ONE binary.
@@ -127,7 +127,7 @@ description = "Menu-bar preview of candidate icon states (click a variant to cyc
 run = "swift scripts/glyphlab.swift"
 
 [tasks.install]
-description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the Claude skill, the launchd agent"
+description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the agent skill (Claude Code, Codex), the launchd agent"
 depends = ["icon"]
 run = '''
 mise run build
@@ -157,11 +157,14 @@ rm -rf "$APP.old"
 # (main.swift), so Bundle.main is the app and the defaults domain is the daemon's.
 ln -sf "$APPBIN" "$prefix/bin/awake"
 ln -sf "$APPBIN" "$prefix/bin/asleep"
-# The Claude skill ships with the app (_core skills convention: symlinked dir,
-# editing the repo updates the live skill).
-mkdir -p "$HOME/.claude/skills"
-ln -sfn "$PWD/skill" "$HOME/.claude/skills/awake"
-echo "installed $APP (+ awake, asleep symlinks, claude skill)"
+# The agent skill, linked to the REPO here so editing it updates the live skill in
+# every agent at once (a released app links its bundled copy: `awake skill install`).
+for skills in "$HOME/.claude/skills" "${CODEX_HOME:-$HOME/.codex}/skills"; do
+  [ -d "$(dirname "$skills")" ] || continue
+  mkdir -p "$skills"
+  ln -sfn "$PWD/skill" "$skills/awake"
+done
+echo "installed $APP (+ awake, asleep symlinks, the agent skill)"
 # The binary owns the agent, not this file: a double click and the first CLI call
 # after a Homebrew install register it the same way, one implementation.
 "$APPBIN" agent install

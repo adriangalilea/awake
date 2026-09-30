@@ -25,9 +25,9 @@ awake --on-end 'notify done' -w 4821   # be told when the claim ends, any reason
 
 Intent is a set of **claims**: yours, an agent's process watch and a build's timer coexist instead of replacing each other. The Mac stays awake while any claim lives, sleep restores when the last one ends, and the menu bar lists who is holding it awake and why.
 
-**Closing the lid stays yours.** Your own claims survive it; a named claim — any program: a cron job, a build, a coding agent — keeps the Mac awake lid-open only, and may *ask* for lid-closed survival (`--lid`). The cup grows a "?" and the menu leads with the ask; one click answers it, and the grant dies with the claim it answered. The cup itself tells you what closing the lid will do: outline = sleeping normally, filled = held awake but bag-safe, burning = it will keep running with the lid shut.
+**Closing the lid stays yours.** Your own claims survive it; a named claim (any program: a cron job, a build, a coding agent) keeps the Mac awake lid-open only, and may *ask* for lid-closed survival (`--lid`). The cup grows a "?" and the menu leads with the ask; one click answers it, and the grant dies with the claim it answered. The cup itself tells you what closing the lid will do: outline = sleeping normally, filled = held awake but bag-safe, burning = it will keep running with the lid shut.
 
-Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle **your claim and nothing else**: with yours running it ends it — lid disarms, named claims keep working; with none it starts yours at the checkmarked duration (which arms lid). Putting the whole machine to sleep is a separate, explicit act: "Let it sleep" in the menu (`awake suspend`) keeps every claim inert until Resume, and "End all claims" (`asleep`) is the nuke. Each roster row opens into its own controls: allow, dismiss or revoke a lid ask, end one stuck session or all of an owner's. Left-click for the menu.
+Right-click the menu bar cup, or press ⌃⌥⌘A anywhere, to toggle **your claim and nothing else**: with yours running it ends it (the lid disarms, named claims keep working); with none it starts yours at the checkmarked duration (which arms lid). Putting the whole machine to sleep is a separate, explicit act: "Let it sleep" in the menu (`awake suspend`) keeps every claim inert until Resume, and "End all claims" (`asleep`) is the nuke. Each roster row opens into its own controls: allow, dismiss or revoke a lid ask, end one stuck session or all of an owner's. Left-click for the menu.
 
 ## Install
 
@@ -55,6 +55,16 @@ Either path installs the app and puts `awake` and `asleep` on your PATH. The dae
 ```
 
 That is the whole privilege footprint. `awake grant --remove` deletes it, `mise run uninstall` removes everything else.
+
+## With coding agents
+
+awake ships an [agent skill](skill/SKILL.md) for Claude Code and Codex. It teaches the agent to hold the Mac awake for exactly as long as its work runs (`awake -w <pid>`), to ask you before it keeps going with the lid shut, and never to reach for `caffeinate`, which dies when the lid closes.
+
+```
+awake skill install
+```
+
+links it into `~/.claude/skills` and `~/.codex/skills`, for whichever of the two is on your Mac. The link points into the app, so every upgrade of awake upgrades the skill. `awake skill` shows where it is installed, `awake skill remove` takes it away, and deleting the app removes it too.
 
 ## How it actually works
 

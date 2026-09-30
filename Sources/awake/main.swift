@@ -44,6 +44,8 @@ case "agent":
     Agent.run(Array(args.dropFirst()))
 case "hotkey":
     Hotkey.run(Array(args.dropFirst()))
+case "skill":
+    Skill.run(Array(args.dropFirst()))
 case "help", "-h", "--help":
     print(CLI.usage)
 default:

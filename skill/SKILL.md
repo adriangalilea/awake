@@ -5,7 +5,7 @@ description: Keep a Mac awake, lid closed included, via the `awake` CLI. Trigger
 
 # awake
 
-One state machine for keep-awake, lid closed included. A launchd daemon owns intent and the menu bar cup; `awake` and `asleep` are socket clients. Intent is a set of CLAIMS: every party that wants the Mac awake holds its own claim, the effect is their union, and sleep restores when the last claim ends. Architecture: the CLAUDE.md in this repository.
+One state machine for keep-awake, lid closed included. A launchd daemon owns intent and the menu bar cup; `awake` and `asleep` are socket clients. Intent is a set of CLAIMS: every party that wants the Mac awake holds its own claim, the effect is their union, and sleep restores when the last claim ends. Source and architecture: https://github.com/adriangalilea/awake
 
 ## Commands
 
