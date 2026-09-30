@@ -9,7 +9,7 @@
 #   release    signed, notarized, stapled dmg → tag → GitHub Release → cask
 #   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden (release does this)
 #   cask       bump the Homebrew cask to the built dmg (release does this)
-#   icon       redraw Resources/awake.icns + icon.png from scripts/make-icon.swift
+#   icon       render Resources/awake.icns + icon.png from scripts/icon.svg (rsvg-convert)
 # Every compiling task runs under scripts/locked.sh (the build mutex);
 # scripts/assemble.sh builds the .app for install AND release, one implementation.
 
@@ -107,10 +107,20 @@ pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FI
 '''
 
 [tasks.icon]
-description = "Redraw Resources/awake.icns + icon.png from scripts/make-icon.swift (the web surface wants the flat PNG too)"
-sources = ["scripts/make-icon.swift"]
+description = "Render Resources/awake.icns + icon.png from scripts/icon.svg (the web surface and the scenes want the flat PNG too)"
+sources = ["scripts/icon.svg"]
 outputs = ["Resources/awake.icns", "Resources/icon.png"]
-run = "swift scripts/make-icon.swift"
+run = '''
+set -euo pipefail
+set_dir=$(mktemp -d)/awake.iconset
+mkdir -p "$set_dir"
+for pt in 16 32 128 256 512; do
+  rsvg-convert -w $pt -h $pt scripts/icon.svg -o "$set_dir/icon_${pt}x${pt}.png"
+  rsvg-convert -w $((pt * 2)) -h $((pt * 2)) scripts/icon.svg -o "$set_dir/icon_${pt}x${pt}@2x.png"
+done
+iconutil -c icns "$set_dir" -o Resources/awake.icns
+rsvg-convert -w 512 -h 512 scripts/icon.svg -o Resources/icon.png
+'''
 
 [tasks.glyphlab]
 description = "Menu-bar preview of candidate icon states (click a variant to cycle) — scripts/glyphlab.swift"
