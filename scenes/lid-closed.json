@@ -40,7 +40,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Two hours, lid closed included."
+      "text" : "awake 2h: two hours awake, even with the lid closed."
     },
     {
       "author" : true,
@@ -94,7 +94,7 @@
     {
       "author" : true,
       "kind" : "caption",
-      "text" : "Fifty minutes left."
+      "text" : "Open it 1h 10m later: awake status says 50 minutes left."
     }
   ]
 }

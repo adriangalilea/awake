@@ -3,11 +3,11 @@
 clock 10:12 · battery 72 · power ac · floor 15
 
 right-click
-caption "Right-click the cup: awake."
+caption "Right-click the cup: it fills, awake is on."
 key
-caption "⌃⌥⌘A: back to normal sleep."
+caption "Press ⌃⌥⌘A: it empties, the Mac sleeps normally again."
 $ awake
-caption "The terminal throws the same switch."
+caption "Type awake in a terminal: the same switch."
 open menu
-caption "Click it to see what holds the Mac awake."
+caption "Left-click the cup: the menu shows what holds the Mac awake."
 close menu
