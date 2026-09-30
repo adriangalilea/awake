@@ -31,8 +31,8 @@ let usage = """
       awake hotkey [COMBO]  show/remap the global toggle (--reset for default)
       awake grant           install the scoped sudoers grant (once)
       awake grant --remove  remove it · --force reinstalls over an existing rule
-      awake agent install   write + bootstrap the launchd agent for THIS binary
-      awake agent uninstall stop it and remove the plist
+      awake agent install   register the agent for THIS bundle (or restart it into it)
+      awake agent uninstall stop it and unregister it
 
     Lid-closed survival is YOURS to grant. Your own claims (menu, hotkey, bare
     `awake`) carry it; a named claim — any programmatic caller: a cron job, a
@@ -49,21 +49,30 @@ let usage = """
     with the display dark (someone else's assertion), it is put to sleep.
     """
 
+// Run as the bundle's own executable, always. Invoked through a symlink
+// (~/.local/bin/awake, /opt/homebrew/bin/asleep), Bundle.main is the symlink's
+// directory, not the app: SMAppService would look for the agent's plist there, the
+// notifier would not be found, and the defaults domain would not be the daemon's.
+// Re-exec through the resolved path; argv is kept, so `asleep` still dispatches.
+if let exe = Bundle.main.executablePath {
+    let real = URL(fileURLWithPath: exe).resolvingSymlinksInPath().path
+    if real != exe {
+        let argv = CommandLine.arguments.map { strdup($0) } + [nil]
+        execv(real, argv)
+        fatalError("execv \(real): \(String(cString: strerror(errno)))")
+    }
+}
+
 let rawArgs = CommandLine.arguments
 let invocation = URL(fileURLWithPath: rawArgs[0]).lastPathComponent
 let args = Array(rawArgs.dropFirst())
 
 // LaunchServices (a double click, Spotlight, `open`) starts the bundle with no
-// arguments and launchd as parent. That launch means "make awake run": install the
-// agent for this image. It is also how the cask installs: launchd refuses bootstrap
-// to any sandboxed caller, Homebrew runs cask steps sandboxed, and an app opened
-// through LaunchServices runs outside the sandbox of whoever opened it. Output goes
-// to the service log, since nobody reads an LS-launched process's stderr.
+// arguments and launchd as parent. That launch means "make awake run": register
+// the agent, or restart it into this image. Output goes to the service log, since
+// nobody reads an LS-launched process's stderr.
 if args.isEmpty, getppid() == 1, Bundle.main.bundleIdentifier != nil {
-    Paths.ensureLogDir()
-    let serviceLog = Paths.logDir.appendingPathComponent("service.log").path
-    precondition(
-        freopen(serviceLog, "a", stdout) != nil && freopen(serviceLog, "a", stderr) != nil)
+    Paths.redirectOutputToServiceLog()
     log("launched by LaunchServices, installing the agent")
     Agent.install()
     exit(0)
@@ -76,6 +85,9 @@ if invocation == "asleep" {
 
 switch args.first {
 case "daemon":
+    // Under launchd the bundled plist cannot name a per-user log path; a foreground
+    // dev daemon (`mise dev`) keeps its terminal.
+    if getppid() == 1 { Paths.redirectOutputToServiceLog() }
     Daemon.main()  // never returns
 case "grant":
     Sudoers.run(remove: args.contains("--remove"), force: args.contains("--force"))

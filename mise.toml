@@ -39,8 +39,8 @@ run = "scripts/locked.sh swift build -c release"
 description = "Foreground DEBUG daemon; stops the installed agent, restores it on exit"
 run = '''
 scripts/locked.sh swift build
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-trap 'launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist" 2>/dev/null || true' EXIT
+"$APPBIN" agent uninstall
+trap '"$APPBIN" agent install' EXIT
 .build/debug/awake daemon
 '''
 
@@ -76,19 +76,28 @@ run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
 mkdir -p "$prefix/bin" "$HOME/Library/Logs/awake"
-scripts/assemble.sh "$APP"
-# Developer ID gives a STABLE identity — TCC ties notification permission to the
-# signature, and ad-hoc identities churn every rebuild (UNErrorDomain Code=1).
-# Discovered, never hardcoded, so a fork signs with its own certificate; falls
-# back to ad-hoc on machines without the cert.
+# Assembled and signed beside the live bundle, then swapped in with one rename,
+# the way Homebrew moves a bundle: the running daemon restarts into whatever sits
+# at $APP, and an image caught unsigned mid-install is one launchd refuses.
+stage="$APP.staging"
+rm -rf "$stage"
+scripts/assemble.sh "$stage"
+# Developer ID is REQUIRED: SMAppService refuses to register an agent from an
+# ad-hoc bundle (kSMErrorInvalidSignature), and TCC ties notification permission
+# to a stable signature (ad-hoc identities churn every rebuild). Discovered, never
+# hardcoded, so a fork signs with its own certificate.
 # Inner first, then outer: a nested app must carry its own signature before the
-# enclosing bundle is sealed over it. Notification permission is tied to the
-# NOTIFIER's identity, so a stable Developer ID matters most on that one.
+# enclosing bundle is sealed over it.
 sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
-codesign --force --sign "${sign_id:--}" "$APP/Contents/Helpers/awake-notifier.app"
-codesign --force --sign "${sign_id:--}" "$APP"
-# CLI = symlinks into the bundle: Bundle.main resolves through them, so the CLI
-# shares the daemon's defaults domain (hotkey remaps land where the daemon reads).
+test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain: SMAppService refuses ad-hoc bundles"; exit 1; }
+codesign --force --sign "$sign_id" "$stage/Contents/Helpers/awake-notifier.app"
+codesign --force --sign "$sign_id" "$stage"
+rm -rf "$APP.old"
+if [ -d "$APP" ]; then mv "$APP" "$APP.old"; fi
+mv "$stage" "$APP"
+rm -rf "$APP.old"
+# CLI = symlinks into the bundle; the binary re-execs through the resolved path
+# (main.swift), so Bundle.main is the app and the defaults domain is the daemon's.
 ln -sf "$APPBIN" "$prefix/bin/awake"
 ln -sf "$APPBIN" "$prefix/bin/asleep"
 # The Claude skill ships with the app (_core skills convention: symlinked dir,
@@ -96,8 +105,8 @@ ln -sf "$APPBIN" "$prefix/bin/asleep"
 mkdir -p "$HOME/.claude/skills"
 ln -sfn "$PWD/skill" "$HOME/.claude/skills/awake"
 echo "installed $APP (+ awake, asleep symlinks, claude skill)"
-# The binary owns the launchd agent, not this file: a cask's postflight installs
-# it the same way, and one implementation cannot drift from itself.
+# The binary owns the agent, not this file: a double click and the first CLI call
+# after a Homebrew install register it the same way, one implementation.
 "$APPBIN" agent install
 '''
 
@@ -105,10 +114,10 @@ echo "installed $APP (+ awake, asleep symlinks, claude skill)"
 description = "Remove app, symlinks, launchd agent (sudoers grant: awake grant --remove)"
 run = '''
 prefix="${PREFIX:-$HOME/.local}"
-if [ -x "$APPBIN" ]; then "$APPBIN" agent uninstall
-else launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true; fi
+# Unregister while the bundle exists: SMAppService resolves the agent through it.
+test -x "$APPBIN" && "$APPBIN" agent uninstall
 rm -rf "$APP"
-rm -f "$HOME/Library/LaunchAgents/$LABEL.plist" "$prefix/bin/awake" "$prefix/bin/asleep"
+rm -f "$prefix/bin/awake" "$prefix/bin/asleep"
 echo "removed app, symlinks, launchd agent. Sudoers grant: sudo rm /etc/sudoers.d/awake"
 '''
 

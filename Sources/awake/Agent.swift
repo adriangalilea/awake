@@ -1,11 +1,26 @@
 import AwakeKit
 import Foundation
+import ServiceManagement
 
-/// The launchd agent, owned by the BINARY rather than by an installer, because
-/// there is more than one installer: `mise run install`, a LaunchServices launch
-/// (double click, and the Homebrew cask's step), and a human doing it by hand all
-/// have to land the same plist pointed at the same image. A copy of this logic in an install script is a copy that drifts.
+/// The launchd agent, registered by the app itself through SMAppService. Its plist
+/// ships inside the bundle (Contents/Library/LaunchAgents, `BundleProgram`), so
+/// launchd always runs the image at the bundle's path: an upgrade that replaces
+/// the bundle keeps the registration, and the next start runs the new binary.
+///
+/// Every install path lands here: `mise run install`, a double click (an
+/// argument-less LaunchServices launch), and the first CLI call that finds no
+/// daemon, which is how a Homebrew install comes alive. The cask cannot do it:
+/// cask steps run sandboxed, and launchd bootstrap, LaunchServices and
+/// SMAppService all refuse a sandboxed caller. Removal is the daemon's own job
+/// (Daemon.watchImage): deleting the app leaves the registration in place, and
+/// launchd would retry the missing binary forever.
+///
+/// SMAppService refuses an ad-hoc signature (kSMErrorInvalidSignature): the
+/// bundle must carry a Developer ID.
 enum Agent {
+    static var service: SMAppService { .agent(plistName: "\(Paths.launchdLabel).plist") }
+    private static var target: String { "gui/\(getuid())/\(Paths.launchdLabel)" }
+
     static func run(_ args: [String]) {
         switch args.first {
         case "install": install()
@@ -14,108 +29,125 @@ enum Agent {
         }
     }
 
-    private static var domain: String { "gui/\(getuid())" }
-    private static var service: String { "\(domain)/\(Paths.launchdLabel)" }
+    static var registered: Bool { service.status == .enabled }
 
-    /// The running binary with symlinks resolved. The CLI is normally invoked
-    /// through a symlink into the bundle, and launchd must be handed the real
-    /// image or it runs whatever the symlink pointed at when it was written.
-    private static var binaryPath: String {
-        URL(fileURLWithPath: Bundle.main.executablePath ?? CommandLine.arguments[0])
-            .resolvingSymlinksInPath().path
+    /// Diagnostics go to stderr: the first CLI call after an install runs this
+    /// before printing its own answer, and `awake status --json` must stay JSON.
+    private static func say(_ line: String) {
+        FileHandle.standardError.write(Data((line + "\n").utf8))
     }
 
     static func install() {
-        let fm = FileManager.default
-        try? fm.createDirectory(at: Paths.logDir, withIntermediateDirectories: true)
-        try? fm.createDirectory(
-            at: Paths.launchdPlist.deletingLastPathComponent(),
-            withIntermediateDirectories: true)
-        let log = Paths.logDir.appendingPathComponent("service.log").path
-        do {
-            try plist(bin: binaryPath, log: log)
-                .write(to: Paths.launchdPlist, atomically: true, encoding: .utf8)
-        } catch {
-            Client.die("cannot write \(Paths.launchdPlist.path): \(error.localizedDescription)")
+        removeUserAgentPlist()
+        if registered {
+            // Registered already, so this is a reinstall: restart into the image the
+            // bundle holds now. The SIGTERM parks the claims; startup re-arms them.
+            _ = AwakeKit.run("/bin/launchctl", ["kickstart", "-k", target])
+        } else {
+            register()
         }
-        stop()
-        let r = AwakeKit.run("/bin/launchctl", ["bootstrap", domain, Paths.launchdPlist.path])
-        guard r.status == 0 else {
-            Client.die(
-                "launchctl bootstrap failed: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
-            )
+        // `enabled` is BTM's record, not launchd's. A job can be registered and
+        // missing from launchd, or loaded and stuck: after a few refused launches
+        // (a launch constraint violation, an image caught mid-install) launchd keeps
+        // it in `spawn scheduled` and kickstart no longer revives it. Only a fresh
+        // registration does, so anything short of running gets one, once.
+        if !waitRunning() {
+            say("agent registered but not running, registering it again")
+            do { try service.unregister() } catch {}
+            register()
+            guard waitRunning() else {
+                Client.die(
+                    "agent registered but launchd does not run it. Why: /usr/bin/log show --last 5m --predicate 'eventMessage CONTAINS \"\(Paths.launchdLabel)\"'"
+                )
+            }
         }
-        print("✓ daemon bootstrapped (\(Paths.launchdLabel)) → \(binaryPath)")
-        prime()
+        say("✓ agent running (\(Paths.launchdLabel)) → \(Bundle.main.bundlePath)")
+        Notifier.launch(["--prime"])
     }
 
-    /// Ask for notification permission NOW, in context, with the human at the
-    /// keyboard and an intro banner that says what will arrive here, instead of
-    /// letting the first real event (a battery-floor end at 3am behind a closed
-    /// lid, prompt unseen, message lost) be the first ask. The notifier itself
-    /// makes this a no-op once the person has answered, so re-installs never nag.
-    private static func prime() {
-        let bundle = URL(fileURLWithPath: binaryPath).deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let notifier = bundle.appendingPathComponent("Helpers/awake-notifier.app")
-        guard
-            FileManager.default.isExecutableFile(
-                atPath: notifier.appendingPathComponent("Contents/MacOS/awake-notifier").path)
-        else { return }
-        let r = AwakeKit.run(
-            "/usr/bin/open", ["-g", "-n", "-a", notifier.path, "--args", "--prime"])
-        if r.status != 0 {
-            print(
-                "⚠ notification prompt could not be launched: \(r.err.trimmingCharacters(in: .whitespacesAndNewlines))"
+    private static func waitRunning() -> Bool {
+        for _ in 0..<20 {
+            if AwakeKit.run("/bin/launchctl", ["print", target]).out.contains("\tstate = running") {
+                return true
+            }
+            usleep(250_000)
+        }
+        return false
+    }
+
+    /// Retried for a few seconds: `register` right after an `unregister` fails with
+    /// EPERM until BTM settles (a second was not always enough).
+    private static func register() {
+        var lastError: Error?
+        for attempt in 0..<6 {
+            if attempt > 0 { sleep(1) }
+            do {
+                try service.register()
+                lastError = nil
+                break
+            } catch {
+                lastError = error
+            }
+        }
+        if let lastError {
+            Client.die(
+                "cannot register the agent: \(lastError.localizedDescription). SMAppService needs the bundle signed with a Developer ID."
             )
+        }
+        switch service.status {
+        case .enabled: return
+        case .requiresApproval:
+            SMAppService.openSystemSettingsLoginItems()
+            Client.die(
+                "macOS holds awake's agent for approval: allow it in System Settings › General › Login Items & Extensions, then run awake again."
+            )
+        default:
+            Client.die("agent registered but its status is \(service.status.rawValue), not enabled")
         }
     }
 
     static func uninstall() {
-        stop()
-        try? FileManager.default.removeItem(at: Paths.launchdPlist)
-        print("✓ daemon removed (\(Paths.launchdLabel))")
+        do {
+            try service.unregister()
+        } catch {
+            Client.die("cannot unregister the agent: \(error.localizedDescription)")
+        }
+        say("✓ agent unregistered (\(Paths.launchdLabel))")
     }
 
-    /// bootout is ASYNCHRONOUS: bootstrapping while the previous instance is still
-    /// tearing down fails with EIO, so wait for the label to actually disappear.
-    /// A running service also keeps executing its OLD image, so every install must
-    /// come through here or it leaves yesterday's binary running.
+    /// The daemon, its bundle deleted, removing its own registration. launchd kills
+    /// this process inside the call, so everything that must happen (sleep
+    /// restored, claims ended) happens before it.
+    static func unregisterSelf() {
+        do {
+            try service.unregister()
+        } catch {
+            log("self-unregister failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// A plist under our label in ~/Library/LaunchAgents is a second definition of
+    /// the same job, loaded at every login, and it would hold the label the bundled
+    /// agent needs. Booted out and deleted before registering.
+    private static func removeUserAgentPlist() {
+        guard FileManager.default.fileExists(atPath: Paths.userAgentPlist.path) else { return }
+        stop()
+        do {
+            try FileManager.default.removeItem(at: Paths.userAgentPlist)
+        } catch {
+            Client.die("cannot remove \(Paths.userAgentPlist.path): \(error.localizedDescription)")
+        }
+        say("removed \(Paths.userAgentPlist.path)")
+    }
+
+    /// bootout is ASYNCHRONOUS: wait for the label to actually disappear before
+    /// anything else claims it.
     private static func stop() {
-        _ = AwakeKit.run("/bin/launchctl", ["bootout", service])
+        _ = AwakeKit.run("/bin/launchctl", ["bootout", target])
         for _ in 0..<20 {
-            if AwakeKit.run("/bin/launchctl", ["print", service]).status != 0 { return }
+            if AwakeKit.run("/bin/launchctl", ["print", target]).status != 0 { return }
             usleep(500_000)
         }
         Client.die("launchd still reports \(Paths.launchdLabel) after bootout")
-    }
-
-    private static func plist(bin: String, log: String) -> String {
-        """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-        \t<key>KeepAlive</key>
-        \t<true/>
-        \t<key>Label</key>
-        \t<string>\(Paths.launchdLabel)</string>
-        \t<key>ProcessType</key>
-        \t<string>Interactive</string>
-        \t<key>ProgramArguments</key>
-        \t<array>
-        \t\t<string>\(bin)</string>
-        \t\t<string>daemon</string>
-        \t</array>
-        \t<key>RunAtLoad</key>
-        \t<true/>
-        \t<key>StandardErrorPath</key>
-        \t<string>\(log)</string>
-        \t<key>StandardOutPath</key>
-        \t<string>\(log)</string>
-        </dict>
-        </plist>
-
-        """
     }
 }

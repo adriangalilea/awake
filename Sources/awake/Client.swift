@@ -10,18 +10,23 @@ enum Client {
         exit(1)
     }
 
-    /// One round trip, auto-starting the daemon when it isn't reachable. launchd
-    /// kickstart -k also recovers a wedged daemon (alive but not accepting).
+    /// One round trip, bringing the daemon up when it isn't reachable: no agent
+    /// registered (a fresh `brew install`, or unregistered) → register it; registered
+    /// → kickstart -k, which also recovers a wedged daemon (alive but not accepting).
     static func send(_ cmd: Command) -> Reply {
         if let r = Wire.roundTrip(cmd) { return r }
-        _ = AwakeKit.run(
-            "/bin/launchctl",
-            ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
+        if Agent.registered {
+            _ = AwakeKit.run(
+                "/bin/launchctl",
+                ["kickstart", "-k", "gui/\(getuid())/\(Paths.launchdLabel)"])
+        } else {
+            Agent.install()
+        }
         for _ in 0..<50 {
             usleep(100_000)
             if let r = Wire.roundTrip(cmd) { return r }
         }
-        die("daemon unreachable. Install the launchd agent with: awake agent install")
+        die("daemon unreachable after starting its agent. Why: \(Paths.serviceLog.path)")
     }
 
     // MARK: - Commands

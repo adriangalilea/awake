@@ -226,17 +226,28 @@ public enum Paths {
     public static let socket = stateDir.appendingPathComponent("awake.sock")
     public static let sudoers = "/etc/sudoers.d/awake"
     public static let launchdLabel = "garden.untitled.awake"
-    public static let launchdPlist = FileManager.default.homeDirectoryForCurrentUser
+    /// Where a hand-installed agent under our label would live; the real one is
+    /// registered from inside the bundle (Agent.swift) and removes this on sight.
+    public static let userAgentPlist = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/LaunchAgents/\(launchdLabel).plist")
     public static let logDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/awake")
+    public static let serviceLog = logDir.appendingPathComponent("service.log")
 
     public static func ensureStateDir() {
         try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
     }
 
-    public static func ensureLogDir() {
+    /// A process launchd or LaunchServices started has no reader on stdout/stderr;
+    /// the service log is where its output belongs. launchd creates no directory,
+    /// so this does.
+    public static func redirectOutputToServiceLog() {
         try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
+        precondition(
+            freopen(serviceLog.path, "a", stdout) != nil
+                && freopen(serviceLog.path, "a", stderr) != nil,
+            "cannot open \(serviceLog.path)")
+        setvbuf(stdout, nil, _IOLBF, 0)
     }
 }
 

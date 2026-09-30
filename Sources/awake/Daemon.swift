@@ -3,6 +3,7 @@ import AwakeKit
 import Foundation
 import IOKit.ps
 import Keymap
+import Security
 import SwiftUI
 
 import enum Grant.Standing  // scoped: Grant's own Claim would shadow AwakeKit's
@@ -144,6 +145,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
             timeInterval: 60, target: self,
             selector: #selector(pollTick),
             userInfo: nil, repeats: true)
+        _ = Self.image  // the image and identity as launched, before anything can replace them
+        _ = Self.selfRequirement
         // Startup re-armed persisted claims before the hooks existed; the nets judge
         // them now, with notifications wired, not a poll interval later.
         machine.tick()
@@ -157,8 +160,80 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func pollTick() {
+        watchImage()
         machine.tick()
         checkForUpdate()
+    }
+
+    // MARK: - Own lifecycle
+
+    /// The executable this process runs, identified by inode: an upgrade puts a
+    /// different file at the same path.
+    private static let image: (path: String, inode: ino_t) = {
+        let path = Bundle.main.executablePath!
+        var st = stat()
+        precondition(stat(path, &st) == 0, "own executable unreadable at \(path)")
+        return (path, st.st_ino)
+    }()
+    private var imageGoneTicks = 0
+
+    /// The bundle on disk against the image running. Replaced (an upgrade, a
+    /// reinstall) → park and exit: KeepAlive restarts into the new image and startup
+    /// re-arms the claims. Gone two ticks in a row (an uninstall; a single absent tick
+    /// is the instant an upgrade swaps bundles) → end every claim, which restores
+    /// sleep, then unregister: a deleted app leaves its registration behind, and
+    /// launchd would retry the missing binary forever. Nothing else is awake to do it
+    /// (cask steps are sandboxed; a Trash drag runs no hook at all).
+    private func watchImage() {
+        let (path, inode) = Self.image
+        var st = stat()
+        guard stat(path, &st) == 0 else {
+            imageGoneTicks += 1
+            log("executable missing at \(path) (\(imageGoneTicks)/2)")
+            guard imageGoneTicks >= 2 else { return }
+            log("app uninstalled: ending every claim and unregistering the agent")
+            machine.endAll(.shutdown)
+            Agent.unregisterSelf()  // launchd kills this process inside the call
+            exit(0)
+        }
+        imageGoneTicks = 0
+        guard st.st_ino != inode else { return }
+        // Restart only into a bundle that is whole and signed as this one is: an
+        // installer writing in place (Finder copying file by file, a signing step
+        // still to come) leaves an image launchd refuses with a launch constraint
+        // violation, and after a few refusals launchd drops the job for good.
+        guard Self.bundleSignedAsSelf() else {
+            log("executable replaced at \(path), bundle not yet validly signed, waiting")
+            return
+        }
+        log("executable replaced at \(path), restarting into the new image")
+        machine.park()
+        exit(0)
+    }
+
+    /// This process's designated requirement (identifier + Team ID), captured at
+    /// launch: the one identity a replacement bundle must satisfy.
+    private static let selfRequirement: SecRequirement = {
+        var me: SecCode?
+        var meOnDisk: SecStaticCode?
+        var requirement: SecRequirement?
+        precondition(SecCodeCopySelf([], &me) == errSecSuccess, "SecCodeCopySelf failed")
+        precondition(
+            SecCodeCopyStaticCode(me!, [], &meOnDisk) == errSecSuccess, "own static code unreadable"
+        )
+        precondition(
+            SecCodeCopyDesignatedRequirement(meOnDisk!, [], &requirement) == errSecSuccess,
+            "own designated requirement unreadable")
+        return requirement!
+    }()
+
+    private static func bundleSignedAsSelf() -> Bool {
+        var code: SecStaticCode?
+        guard
+            SecStaticCodeCreateWithPath(Bundle.main.bundleURL as CFURL, [], &code) == errSecSuccess
+        else { return false }
+        return SecStaticCodeCheckValidity(
+            code!, SecCSFlags(rawValue: kSecCSCheckNestedCode), selfRequirement) == errSecSuccess
     }
 
     // MARK: - Update check

@@ -16,6 +16,11 @@ mkdir -p "$dest/Contents/MacOS" "$dest/Contents/Resources"
 ditto .build/release/awake "$dest/Contents/MacOS/awake"
 ditto Resources/awake.icns "$dest/Contents/Resources/awake.icns"
 sed "s|__VERSION__|$VERSION|g" launchd/Info.plist.in > "$dest/Contents/Info.plist"
+# The agent's plist lives IN the bundle, registered by SMAppService (Agent.swift):
+# launchd runs whatever image sits at the bundle's path, so it follows upgrades.
+# Per-user paths cannot appear in it; the daemon points its own output at its log.
+mkdir -p "$dest/Contents/Library/LaunchAgents"
+ditto launchd/garden.untitled.awake.plist "$dest/Contents/Library/LaunchAgents/garden.untitled.awake.plist"
 mkdir -p "$helper/Contents/MacOS" "$helper/Contents/Resources"
 ditto .build/release/awake-notifier "$helper/Contents/MacOS/awake-notifier"
 ditto Resources/awake.icns "$helper/Contents/Resources/awake.icns"
