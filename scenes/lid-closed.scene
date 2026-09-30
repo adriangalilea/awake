@@ -2,10 +2,11 @@
 # counting down when it comes out.
 clock 14:30 · battery 88 · floor 15
 
-caption "two hours awake, lid closed included"
 $ awake 2h
-@900 lid close
-caption "into the bag, still running"
-@1400 time +1h10m · battery 71
-@1200 lid open
+caption "Two hours awake, lid closed included."
+lid close
+time +1h10m · battery 71
+caption "In the bag, still running."
+lid open
 $ awake status
+caption "Fifty minutes left, right where you left it."

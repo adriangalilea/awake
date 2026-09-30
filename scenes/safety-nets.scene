@@ -2,14 +2,12 @@
 # ends the claim with charge to spare, and the Mac sleeps.
 clock 22:10 · battery 41 · floor 15
 
-caption "one chord holds the Mac awake, lid closed included"
 key
-@1000 open menu
-@1400 close menu
-
-caption "you close the lid and forget it in a bag"
-@900 lid close
-@1200 time +3h05m · battery 15
-
-@1400 lid open
+caption "You keep the Mac awake for the night."
+lid close
+caption "Then you forget it in a bag."
+time +3h05m · battery 15
+caption "At 15%, the battery floor ends every claim and the Mac sleeps, with charge to spare."
+lid open
+caption "The banner says what happened."
 $ awake status

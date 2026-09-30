@@ -3,6 +3,7 @@
   "chord" : "⌃⌥⌘A",
   "steps" : [
     {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -19,10 +20,7 @@
       "tooltip" : "awake: off, Mac sleeps normally"
     },
     {
-      "kind" : "caption",
-      "text" : "one chord keeps the Mac awake"
-    },
-    {
+      "author" : true,
       "keys" : "⌃⌥⌘A",
       "kind" : "key"
     },
@@ -32,11 +30,12 @@
       "tooltip" : "awake: you · indefinite"
     },
     {
+      "author" : true,
       "kind" : "caption",
-      "text" : "the cup fills and burns: closing the lid won't sleep it"
+      "text" : "⌃⌥⌘A starts your session. The cup fills and burns: even a closed lid won't sleep the Mac."
     },
     {
-      "delay" : 1100,
+      "author" : true,
       "kind" : "menu",
       "rows" : [
         {
@@ -126,22 +125,28 @@
       ]
     },
     {
-      "delay" : 700,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The menu says who is holding the Mac awake, and for how long."
+    },
+    {
+      "author" : true,
       "kind" : "hover",
       "path" : [
         15
       ]
     },
     {
-      "delay" : 1300,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "A battery floor ends every claim before the charge runs out."
+    },
+    {
+      "author" : true,
       "kind" : "close"
     },
     {
-      "kind" : "caption",
-      "text" : "the same chord lets it sleep again"
-    },
-    {
-      "delay" : 900,
+      "author" : true,
       "keys" : "⌃⌥⌘A",
       "kind" : "key"
     },
@@ -149,6 +154,11 @@
       "glyph" : "off",
       "kind" : "glyph",
       "tooltip" : "awake: off, Mac sleeps normally"
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The same chord ends your session, and the Mac sleeps as usual."
     }
   ]
 }

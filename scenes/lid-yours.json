@@ -3,6 +3,7 @@
   "chord" : "⌃⌥⌘A",
   "steps" : [
     {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -19,10 +20,19 @@
       "tooltip" : "awake: off, Mac sleeps normally"
     },
     {
-      "kind" : "caption",
-      "text" : "a long refactor starts, and claude asks awake to hold the Mac"
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 64,
+        "charging" : false,
+        "clock" : "21:04",
+        "heat" : false,
+        "lid" : "open"
+      }
     },
     {
+      "author" : true,
       "kind" : "command",
       "text" : "awake -w 4127 --lid"
     },
@@ -44,7 +54,12 @@
       "tooltip" : "awake: claude · while it runs (pid 4127) · asks lid"
     },
     {
-      "delay" : 900,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "claude asks awake to keep the Mac up while it works, lid closed included."
+    },
+    {
+      "author" : true,
       "kind" : "menu",
       "rows" : [
         {
@@ -155,13 +170,19 @@
       ]
     },
     {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The question waits in the menu. Nothing changes until you answer it."
+    },
+    {
+      "author" : true,
       "kind" : "hover",
       "path" : [
-        4
+        5
       ]
     },
     {
-      "delay" : 700,
+      "author" : true,
       "kind" : "press",
       "path" : [
         5
@@ -173,11 +194,12 @@
       "tooltip" : "awake: claude · while it runs (pid 4127) · lid granted"
     },
     {
+      "author" : true,
       "kind" : "caption",
-      "text" : "you close the lid and leave"
+      "text" : "The cup burns: while claude runs, closing the lid will not sleep the Mac."
     },
     {
-      "delay" : 900,
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -189,7 +211,7 @@
       }
     },
     {
-      "delay" : 1200,
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -201,8 +223,21 @@
       }
     },
     {
+      "author" : true,
       "kind" : "caption",
-      "text" : "the refactor finishes"
+      "text" : "Two hours later the lid is still shut, and the work goes on."
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 38,
+        "charging" : false,
+        "clock" : "23:18",
+        "heat" : false,
+        "lid" : "closed"
+      }
     },
     {
       "kind" : "banner",
@@ -225,7 +260,12 @@
       }
     },
     {
-      "delay" : 1200,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The work ends. With nothing left holding it, the Mac goes to sleep."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -237,6 +277,12 @@
       }
     },
     {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The banner saying why is waiting when you come back."
+    },
+    {
+      "author" : true,
       "kind" : "command",
       "text" : "awake status"
     },

@@ -25,6 +25,9 @@ struct ScriptError: Error {
 ///   menu     open menu · hover "Title" · click "Title" · close menu
 ///   gestures key (the toggle chord) · right-click
 ///   stage    caption "text" · wait 1200
+/// Show, then tell: a caption goes AFTER the step it explains, so the viewer sees
+/// the thing happen and then reads what it was. Pauses are rarely needed: the player
+/// waits for everything a step put on screen to be read before the next one.
 @MainActor
 final class Player {
     private let world: ScriptedWorld
@@ -103,14 +106,14 @@ final class Player {
         case "hover":
             let path = try resolve(quoted(rest))
             hovered = path[0]
-            emit(Step(.hover), path: path)
+            emit(Step(.hover), path: path, author: true)
         case "click":
             let path = try resolve(quoted(rest))
             let row = row(at: path)
             guard let action = row.action else {
                 throw fail("'\(row.title)' does nothing when clicked; hover it for its submenu")
             }
-            emit(Step(.press), path: path)
+            emit(Step(.press), path: path, author: true)
             closeMenu(emit: false)
             try effect(machine.perform(action))
         case "key":
@@ -119,15 +122,15 @@ final class Player {
             }
             var s = Step(.key)
             s.keys = chord
-            emit(s)
+            emit(s, author: true)
             try effect(machine.toggle())
         case "right-click":
-            emit(Step(.rightClick))
+            emit(Step(.rightClick), author: true)
             try effect(machine.toggle())
         case "caption":
             var s = Step(.caption)
             s.text = try quoted(rest)
-            emit(s)
+            emit(s, author: true)
         case "wait":
             guard let ms = Int(rest) else { throw fail("'wait <ms>'") }
             pendingDelay = (pendingDelay ?? 0) + ms
@@ -143,7 +146,7 @@ final class Player {
         }
         var s = Step(.command)
         s.text = text
-        emit(s)
+        emit(s, author: true)
         let host = CLI.Host(
             now: world.now,
             process: { [world] pid in world.processes[pid].map { ($0.started, $0.name) } },
@@ -158,7 +161,7 @@ final class Player {
             for l in out.lines {
                 var o = Step(l.allSatisfy { $0.tone == .muted } ? .muted : .output)
                 o.text = l.map(\.text).joined()
-                emit(o)
+                emit(o, author: false)
             }
         }
         if let failure {
@@ -167,7 +170,7 @@ final class Player {
             }
             var o = Step(.output)
             o.text = "awake: \(failure)"
-            emit(o)
+            emit(o, author: false)
         } else if expectFailure {
             throw fail("`\(text)` succeeded, but $! says it should fail")
         }
@@ -222,7 +225,7 @@ final class Player {
             }
         }
         // The change itself shows first, then what awake does about it.
-        showWorld()
+        showWorld(author: true)
         // What the daemon hears: IOPS, thermal and poll ticks. An asleep Mac hears nothing.
         if !world.asleep { machine.tick() }
     }
@@ -240,13 +243,13 @@ final class Player {
         hovered = nil
         var s = Step(.menu)
         s.rows = menu!.map(export)
-        emit(s)
+        emit(s, author: true)
     }
 
     private func closeMenu(emit close: Bool) {
         menu = nil
         hovered = nil
-        if close { emit(Step(.close)) }
+        if close { emit(Step(.close), author: true) }
     }
 
     private func visible(_ rows: [MenuRow]) -> [MenuRow] {
@@ -314,7 +317,7 @@ final class Player {
         for b in banners {
             var s = Step(.banner)
             s.text = b
-            emit(s)
+            emit(s, author: false)
         }
         banners = []
         let glyph = Glyph(
@@ -325,30 +328,40 @@ final class Player {
             var s = Step(.glyph)
             s.glyph = glyph.rawValue
             s.tooltip = Glyph.tooltip(machine.claims, suspended: machine.suspended, now: world.now)
-            emit(s)
+            emit(s, author: false)
         }
-        showWorld()
+        showWorld(author: false)
     }
 
-    private func showWorld() {
+    private func showWorld(author: Bool) {
         let power = world.power()
         let state = WorldState(
             clock: Self.clock.string(from: world.now), battery: power.percent, charging: power.onAC,
             lid: world.lidClosed ? "closed" : "open", asleep: world.asleep,
             heat: world.thermalCritical)
-        if state != shownWorld {
+        // An authored change always lands, even one the stage cannot show (a process
+        // exiting): it is the cause the reactions after it wait behind.
+        if author || state != shownWorld {
             shownWorld = state
             var s = Step(.world)
             s.world = state
-            emit(s)
+            emit(s, author: author)
         }
     }
 
-    private func emit(_ step: Step, path: [Int]? = nil) {
+    /// `author`: the script did this (a command, a click, the lid, a caption), as
+    /// opposed to awake answering it (output, a banner, the glyph, the Mac going to
+    /// sleep). The player gives the viewer time to read what the last author step
+    /// caused before it plays the next one; a reaction follows its cause at once.
+    /// Only author steps carry the script's `@` pauses.
+    private func emit(_ step: Step, path: [Int]? = nil, author: Bool) {
         var s = step
         if let path { s.path = path }
-        s.delay = pendingDelay
-        pendingDelay = nil
+        if author {
+            s.author = true
+            s.delay = pendingDelay
+            pendingDelay = nil
+        }
         steps.append(s)
     }
 

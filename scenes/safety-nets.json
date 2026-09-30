@@ -3,6 +3,7 @@
   "chord" : "⌃⌥⌘A",
   "steps" : [
     {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -19,10 +20,7 @@
       "tooltip" : "awake: off, Mac sleeps normally"
     },
     {
-      "kind" : "caption",
-      "text" : "one chord holds the Mac awake, lid closed included"
-    },
-    {
+      "author" : true,
       "keys" : "⌃⌥⌘A",
       "kind" : "key"
     },
@@ -32,105 +30,12 @@
       "tooltip" : "awake: you · indefinite"
     },
     {
-      "delay" : 1000,
-      "kind" : "menu",
-      "rows" : [
-        {
-          "disabled" : true,
-          "title" : "Awake · you · indefinite"
-        },
-        {
-          "submenu" : [
-            {
-              "title" : "End claim"
-            }
-          ],
-          "title" : "you · indefinite"
-        },
-        {
-          "disabled" : true,
-          "title" : "Battery 41% · floor 15%"
-        },
-        {
-          "separator" : true
-        },
-        {
-          "chord" : "⌃⌥⌘A",
-          "title" : "End your session"
-        },
-        {
-          "title" : "Let it sleep"
-        },
-        {
-          "separator" : true
-        },
-        {
-          "title" : "30 minutes"
-        },
-        {
-          "title" : "1 hour"
-        },
-        {
-          "title" : "2 hours"
-        },
-        {
-          "title" : "4 hours"
-        },
-        {
-          "title" : "8 hours"
-        },
-        {
-          "checked" : true,
-          "title" : "Indefinite"
-        },
-        {
-          "separator" : true
-        },
-        {
-          "title" : "Keep display on"
-        },
-        {
-          "submenu" : [
-            {
-              "title" : "Off"
-            },
-            {
-              "title" : "10%"
-            },
-            {
-              "checked" : true,
-              "title" : "15%"
-            },
-            {
-              "title" : "20%"
-            },
-            {
-              "title" : "30%"
-            },
-            {
-              "title" : "50%"
-            }
-          ],
-          "title" : "Battery floor"
-        },
-        {
-          "separator" : true
-        },
-        {
-          "title" : "Quit awake"
-        }
-      ]
-    },
-    {
-      "delay" : 1400,
-      "kind" : "close"
-    },
-    {
+      "author" : true,
       "kind" : "caption",
-      "text" : "you close the lid and forget it in a bag"
+      "text" : "You keep the Mac awake for the night."
     },
     {
-      "delay" : 900,
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -142,7 +47,12 @@
       }
     },
     {
-      "delay" : 1200,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Then you forget it in a bag."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -174,7 +84,12 @@
       }
     },
     {
-      "delay" : 1400,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "At 15%, the battery floor ends every claim and the Mac sleeps, with charge to spare."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -186,6 +101,12 @@
       }
     },
     {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "The banner says what happened."
+    },
+    {
+      "author" : true,
       "kind" : "command",
       "text" : "awake status"
     },

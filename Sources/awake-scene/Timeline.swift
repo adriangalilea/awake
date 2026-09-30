@@ -2,8 +2,8 @@ import Foundation
 
 /// The file the web plays: @ag/macos-session's `Timeline`, field for field. Steps are
 /// relative (`delay` = the author's pause before a step, absent = the player's
-/// default for its kind), because pacing (typing speed, how long a line takes to
-/// land) belongs to the player and is never decided twice.
+/// default), and say who caused them (`author`), because pacing (typing speed, how
+/// long a line takes to read) belongs to the player and is never decided twice.
 struct Timeline: Encodable {
     let app: String
     /// The toggle chord, as the menu draws it.
@@ -13,6 +13,8 @@ struct Timeline: Encodable {
 
 struct Step: Encodable {
     var kind: Kind
+    /// The script did this; absent = awake's reaction to it.
+    var author: Bool?
     var delay: Int?
     /// command · output · muted · banner · caption
     var text: String?

@@ -3,6 +3,7 @@
   "chord" : "⌃⌥⌘A",
   "steps" : [
     {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -19,10 +20,7 @@
       "tooltip" : "awake: off, Mac sleeps normally"
     },
     {
-      "kind" : "caption",
-      "text" : "two hours awake, lid closed included"
-    },
-    {
+      "author" : true,
       "kind" : "command",
       "text" : "awake 2h"
     },
@@ -40,7 +38,12 @@
       "tooltip" : "awake: you · 2h 0m left"
     },
     {
-      "delay" : 900,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Two hours awake, lid closed included."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -52,11 +55,7 @@
       }
     },
     {
-      "kind" : "caption",
-      "text" : "into the bag, still running"
-    },
-    {
-      "delay" : 1400,
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -68,7 +67,12 @@
       }
     },
     {
-      "delay" : 1200,
+      "author" : true,
+      "kind" : "caption",
+      "text" : "In the bag, still running."
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -80,6 +84,7 @@
       }
     },
     {
+      "author" : true,
       "kind" : "command",
       "text" : "awake status"
     },
@@ -90,6 +95,11 @@
     {
       "kind" : "muted",
       "text" : "   battery 71% · floor 15%"
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Fifty minutes left, right where you left it."
     }
   ]
 }
