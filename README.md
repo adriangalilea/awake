@@ -127,13 +127,7 @@ mise film            # film each scene (WebP + mp4) and publish it to the CDN
 
 The films above are not screen recordings. Each `scenes/*.scene` is a short story (the lid closes, the battery drops, you open the menu) that `awake-scene` plays through awake's real engine against a scripted Mac. Every menu row, terminal line and banner in them is what awake itself produces, and a scene that clicks a row the menu no longer has fails to compile.
 
-Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect notary key, neither of which belongs in CI, so CI only runs `mise check`. Both live in the keychain, nothing on disk and nothing in this repo. Set the notary profile up once:
-
-```
-xcrun notarytool store-credentials awake \
-  --key ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 \
-  --key-id <KEYID> --issuer <ISSUER-UUID>
-```
+Releasing is deliberately local: it needs a Developer ID certificate and an App Store Connect API key, neither of which belongs in CI, so CI only runs `mise check`. The certificate lives in the keychain; the key is named by the releasing machine's environment (`APPSTORE_KEY`, the `.p8`'s path, plus `APPSTORE_KEY_ID` and `APPSTORE_ISSUER`), never by this repo.
 
 `notes/<version>.md` is the release notes, written by hand and committed. git-cliff only drafts it. The dmg is served through `awake.untitled.garden/releases/<file>` (the cask points there too), which counts each download before redirecting to the CDN; GitHub keeps a copy of the asset.
 

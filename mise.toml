@@ -197,19 +197,15 @@ echo "drafted $notes — REWRITE it for humans, then commit it"
 '''
 
 # Notarization is a credentialed act, so releasing is a LOCAL command: the
-# certificate is in this keychain and the notary key is in ~/.appstoreconnect,
+# certificate is in this keychain and the App Store Connect key is named by
+# this machine's environment (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER),
 # neither of which belongs in CI. CI's job is the 0-warning gate, nothing more.
-# A keychain profile, so no notary identifier and no key path exists in this
-# repo or in any file. Create it once:
-#   xcrun notarytool store-credentials awake \
-#     --key ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 \
-#     --key-id <KEYID> --issuer <ISSUER-UUID>
 [tasks.release]
-description = "ship release: gates, Developer ID, notarized dmg, tag, GitHub Release, publish, cask (LOCAL: needs the Developer ID + notary profile)"
+description = "ship release: gates, Developer ID, notarized dmg, tag, GitHub Release, publish, cask (LOCAL: needs the Developer ID + APPSTORE_KEY)"
 depends = ["icon", "check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
 # (mise check) never releases, so it never builds it.
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.2", filter_bins = "ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
 run = '''
 ship release --name awake --app "$DIST/awake.app" \
   --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
@@ -220,7 +216,7 @@ ship release --name awake --app "$DIST/awake.app" \
 # Every gate the release would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.2", filter_bins = "ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
 run = '''
 ship check --name awake --app "$DIST/awake.app" --assemble "scripts/assemble.sh $DIST/awake.app" \
   --github --after "mise run publish" --cask
