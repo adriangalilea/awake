@@ -125,11 +125,6 @@
     },
     {
       "author" : true,
-      "kind" : "caption",
-      "text" : "If it gets too hot, awake lets it sleep."
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : true,
@@ -156,16 +151,6 @@
     },
     {
       "author" : true,
-      "kind" : "caption",
-      "text" : "Asleep, it cools off."
-    },
-    {
-      "author" : true,
-      "depth" : 0,
-      "kind" : "thermal"
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -175,6 +160,11 @@
         "heat" : true,
         "lid" : "open"
       }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "If it gets too hot, awake lets it sleep to cool off."
     },
     {
       "author" : true,
@@ -244,11 +234,6 @@
     },
     {
       "author" : true,
-      "kind" : "caption",
-      "text" : "If the battery runs low, it sleeps too."
-    },
-    {
-      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -258,6 +243,11 @@
         "heat" : false,
         "lid" : "open"
       }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "If the battery runs low, it sleeps too."
     }
   ]
 }

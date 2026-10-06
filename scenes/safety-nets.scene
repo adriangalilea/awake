@@ -10,14 +10,13 @@ caption "Forgot it was on, lid shut, in a bag?"
 view skin
 time +25m · cpu 99 · gpu 90 · ssd 54 · skin 46 · fans 35
 thermal critical
-caption "If it gets too hot, awake lets it sleep."
 time +20m · cpu 41 · gpu 39 · ssd 42 · skin 32 · fans 0
-caption "Asleep, it cools off."
-view plain
+# Each story ends where the person meets it: the lid opens on awake's banner.
 lid open
+caption "If it gets too hot, awake lets it sleep to cool off."
 thermal nominal
 key
 lid close
 time +3h05m · battery 15
-caption "If the battery runs low, it sleeps too."
 lid open
+caption "If the battery runs low, it sleeps too."
