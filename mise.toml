@@ -209,7 +209,7 @@ description = "ship release: gates, Developer ID, notarized dmg, tag, GitHub Rel
 depends = ["icon", "check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
 # (mise check) never releases, so it never builds it.
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.0", filter_bins = "ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.2", filter_bins = "ship" } }
 run = '''
 ship release --name awake --app "$DIST/awake.app" \
   --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
@@ -220,7 +220,7 @@ ship release --name awake --app "$DIST/awake.app" \
 # Every gate the release would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.0", filter_bins = "ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.19.2", filter_bins = "ship" } }
 run = '''
 ship check --name awake --app "$DIST/awake.app" --assemble "scripts/assemble.sh $DIST/awake.app" \
   --github --after "mise run publish" --cask
