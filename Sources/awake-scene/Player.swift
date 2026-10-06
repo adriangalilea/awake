@@ -20,6 +20,7 @@ struct ScriptError: Error {
 ///            thermal critical|nominal · grant ready|missing · floor 15
 ///            notifications allowed|denied|silenced|not-asked
 ///            process 4127 claude · exit 4127 · time +2h40m · lid close|open
+///            awake on (your claim already held, as the toggle starts it)
 ///            cpu 99 · gpu 88 · ssd 52 · skin 46 · fans 35 (the machine's heat, °C, the
 ///            case's skin, the fans in % of their ceiling: physics awake never reads,
 ///            so the script says it; the stage glides from one reading to the next,
@@ -319,6 +320,11 @@ final class Player {
                     throw fail("'time +2h40m'")
                 }
                 world.now = world.now.addingTimeInterval(t)
+            case ("awake", "on"):
+                // Your claim already held: a story that opens on it (it was on
+                // all along) rather than showing the gesture that started it.
+                guard machine.claims.isEmpty else { throw fail("'awake on': awake is already on") }
+                try effect(machine.toggle())
             case ("lid", "close"): world.lidClosed = true
             case ("lid", "open"):
                 world.lidClosed = false

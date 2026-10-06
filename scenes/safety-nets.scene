@@ -2,13 +2,12 @@
 # the case heats with nowhere for it to go, at critical temperature awake gives up
 # the lid, forced or not, and the Mac sleeps and cools. And if the bag stays cool,
 # the battery floor ends it with charge to spare.
-clock 22:10 · battery 41 · floor 15 · cpu 52 · gpu 46 · ssd 38 · skin 31 · fans 0
-
-key
-lid close
-caption "Forgot it was on, lid shut, in a bag?"
+clock 22:10 · battery 41 · floor 15 · cpu 52 · gpu 46 · ssd 38 · skin 31 · fans 0 · awake on
 view skin
-time +25m · cpu 99 · gpu 90 · ssd 54 · skin 46 · fans 35
+
+# Into the bag: the lid folds while the time-lapse runs and the heat climbs. The
+# `@0` makes it the story's first act, not part of the opening frame.
+@0 lid close · time +25m · cpu 99 · gpu 90 · ssd 54 · skin 46 · fans 35
 thermal critical
 time +20m · cpu 41 · gpu 39 · ssd 42 · skin 32 · fans 0
 # Each story ends where the person meets it: the lid opens on awake's banner.

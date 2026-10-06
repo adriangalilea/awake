@@ -29,36 +29,9 @@
       }
     },
     {
-      "glyph" : "off",
-      "kind" : "glyph",
-      "tooltip" : "awake: off, Mac sleeps normally"
-    },
-    {
-      "author" : true,
-      "keys" : "⌃⌥⌘A",
-      "kind" : "key"
-    },
-    {
       "glyph" : "lid",
       "kind" : "glyph",
       "tooltip" : "awake: you · indefinite"
-    },
-    {
-      "author" : true,
-      "kind" : "world",
-      "world" : {
-        "asleep" : false,
-        "battery" : 41,
-        "charging" : false,
-        "clock" : "22:10",
-        "heat" : false,
-        "lid" : "closed"
-      }
-    },
-    {
-      "author" : true,
-      "kind" : "caption",
-      "text" : "Forgot it was on, lid shut, in a bag?"
     },
     {
       "author" : true,
@@ -67,6 +40,7 @@
     },
     {
       "author" : true,
+      "delay" : 0,
       "kind" : "world",
       "world" : {
         "asleep" : false,
