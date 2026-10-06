@@ -226,8 +226,16 @@ grep -q '^### ' "$notes" && grep -q '^- ' "$notes" || \
   { echo "$notes needs '### Added|Fixed|Changed|Performance|Polish' sections with '- ' items"; exit 1; }
 sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
 test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain"; exit 1; }
-xcrun notarytool history --keychain-profile "$notary" >/dev/null 2>&1 || \
-  { echo "no notary keychain profile '$notary' — see the header of mise.toml"; exit 1; }
+# notarytool's own answer, not a guess at it: a missing profile, a revoked
+# key and an unsigned agreement all fail here, and need different hands.
+if ! answer=$(xcrun notarytool history --keychain-profile "$notary" 2>&1); then
+  echo "notary profile '$notary': $answer"
+  case "$answer" in
+    *"No Keychain password item found"*) echo "create it once: see the header of mise.toml" ;;
+    *agreement*) echo "the Account Holder accepts the pending agreement at https://developer.apple.com/account, then rerun" ;;
+  esac
+  exit 1
+fi
 rm -rf "$DIST" && mkdir -p "$DIST/stage"
 scripts/assemble.sh "$release_app"
 # Hardened runtime + secure timestamp: notarization rejects anything less.
