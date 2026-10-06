@@ -21,9 +21,13 @@ public enum Notice {
         case .lowPowerMode:
             return "Low Power Mode is on. \(still)"
         case .thermal:
-            let labels = Words.summarize(ended, now: now).map(\.owner).joined(separator: ", ")
-            return
-                "Critical heat: lid-closed survival ended (\(labels)), closing the lid sleeps it. \(still)"
+            // What happened and what it means for the Mac, in the person's terms:
+            // only the lid-closed claims end, so with nothing else holding it the
+            // Mac sleeps; with something still holding it, it stays awake only
+            // while the lid is open.
+            return remaining.isEmpty
+                ? "Too hot with the lid closed, so awake let your Mac sleep."
+                : "Too hot with the lid closed: shutting it now sleeps the Mac. \(still)"
         case .externalOff:
             return "Sleep was re-enabled outside awake. All claims ended."
         case .expired:

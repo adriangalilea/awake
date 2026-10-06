@@ -33,12 +33,16 @@ struct Step: Encodable {
     var arg: String?
     /// tool: what came back, one line each
     var lines: [String]?
+    /// thermal: the machine's heat (a reading), how deep the stage shows it, or both
+    var thermal: Reading?
+    var depth: Double?
 
     enum Kind: String, Encodable {
         case world, glyph, command, output, muted, menu, close, hover, press, key
         case rightClick = "right-click"
         case banner, caption, poster
         case agent, history, prompt, say, tool, done
+        case thermal
     }
 
     init(_ kind: Kind, delay: Int? = nil) {
@@ -78,6 +82,14 @@ struct WorldState: Encodable, Equatable {
     let lid: String
     let asleep: Bool
     let heat: Bool
+}
+
+/// The machine's heat as `@ag/thermal` reads it: each part's °C, the case's skin,
+/// each fan's share of its ceiling (off is 0).
+struct Reading: Encodable, Equatable {
+    var parts: [String: Double]
+    var surface: Double?
+    var fans: [Double]
 }
 
 /// The glyph art, rendered by the app's own drawing code: one PNG per state per

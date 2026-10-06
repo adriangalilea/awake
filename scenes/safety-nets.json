@@ -15,6 +15,20 @@
       }
     },
     {
+      "kind" : "thermal",
+      "thermal" : {
+        "fans" : [
+          0
+        ],
+        "parts" : {
+          "cpu" : 52,
+          "gpu" : 46,
+          "ssd" : 38
+        },
+        "surface" : 31
+      }
+    },
+    {
       "glyph" : "off",
       "kind" : "glyph",
       "tooltip" : "awake: off, Mac sleeps normally"
@@ -48,6 +62,37 @@
     },
     {
       "author" : true,
+      "depth" : 1,
+      "kind" : "thermal"
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
+        "asleep" : false,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:35",
+        "heat" : false,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "thermal",
+      "thermal" : {
+        "fans" : [
+          0.35
+        ],
+        "parts" : {
+          "cpu" : 99,
+          "gpu" : 90,
+          "ssd" : 54
+        },
+        "surface" : 46
+      }
+    },
+    {
+      "author" : true,
       "kind" : "world",
       "world" : {
         "asleep" : false,
@@ -60,7 +105,7 @@
     },
     {
       "kind" : "banner",
-      "text" : "Critical heat: lid-closed survival ended (you), closing the lid sleeps it. Sleep restored."
+      "text" : "Too hot with the lid closed, so awake let your Mac sleep."
     },
     {
       "glyph" : "off",
@@ -87,10 +132,46 @@
       "author" : true,
       "kind" : "world",
       "world" : {
+        "asleep" : true,
+        "battery" : 41,
+        "charging" : false,
+        "clock" : "22:55",
+        "heat" : true,
+        "lid" : "closed"
+      }
+    },
+    {
+      "kind" : "thermal",
+      "thermal" : {
+        "fans" : [
+          0
+        ],
+        "parts" : {
+          "cpu" : 41,
+          "gpu" : 39,
+          "ssd" : 42
+        },
+        "surface" : 32
+      }
+    },
+    {
+      "author" : true,
+      "kind" : "caption",
+      "text" : "Asleep, it cools off."
+    },
+    {
+      "author" : true,
+      "depth" : 0,
+      "kind" : "thermal"
+    },
+    {
+      "author" : true,
+      "kind" : "world",
+      "world" : {
         "asleep" : false,
         "battery" : 41,
         "charging" : false,
-        "clock" : "22:35",
+        "clock" : "22:55",
         "heat" : true,
         "lid" : "open"
       }
@@ -102,7 +183,7 @@
         "asleep" : false,
         "battery" : 41,
         "charging" : false,
-        "clock" : "22:35",
+        "clock" : "22:55",
         "heat" : false,
         "lid" : "open"
       }
@@ -124,7 +205,7 @@
         "asleep" : false,
         "battery" : 41,
         "charging" : false,
-        "clock" : "22:35",
+        "clock" : "22:55",
         "heat" : false,
         "lid" : "closed"
       }
@@ -136,7 +217,7 @@
         "asleep" : false,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:40",
+        "clock" : "02:00",
         "heat" : false,
         "lid" : "closed"
       }
@@ -156,7 +237,7 @@
         "asleep" : true,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:40",
+        "clock" : "02:00",
         "heat" : false,
         "lid" : "closed"
       }
@@ -173,7 +254,7 @@
         "asleep" : false,
         "battery" : 15,
         "charging" : false,
-        "clock" : "01:40",
+        "clock" : "02:00",
         "heat" : false,
         "lid" : "open"
       }

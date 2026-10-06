@@ -20,11 +20,17 @@ struct ScriptError: Error {
 ///            thermal critical|nominal · grant ready|missing · floor 15
 ///            notifications allowed|denied|silenced|not-asked
 ///            process 4127 claude · exit 4127 · time +2h40m · lid close|open
+///            cpu 99 · gpu 88 · ssd 52 · skin 46 · fans 35 (the machine's heat, °C, the
+///            case's skin, the fans in % of their ceiling: physics awake never reads,
+///            so the script says it; the stage glides from one reading to the next,
+///            across a `time` jump on the same line)
 ///            (several on one line, joined by ` · `, happen at once)
 ///   terminal $ awake -w 4127 --lid     ($! when the command is meant to fail)
 ///   menu     open menu · hover "Title" · click "Title" · close menu
 ///   gestures key (the toggle chord) · right-click
-///   stage    caption "text" · wait 1200 · poster (the frame a still of the story
+///   stage    view skin|inside|plain (how deep the MacBook shows its heat: the case,
+///            the parts and fans inside it, or nothing; needs a reading first) ·
+///            caption "text" · wait 1200 · poster (the frame a still of the story
 ///            shows: the link card, a shelf; it takes no time, and lands once all
 ///            before it has been read)
 ///   agent    agent claude|codex [cwd] (opens it in the terminal) · agent history
@@ -51,6 +57,8 @@ final class Player {
     private var menu: [MenuRow]?
     private var hovered: Int?
     private var pendingDelay: Int?
+    /// The machine's heat as the script last set it.
+    private var reading: Reading?
     private var line = 0
 
     private static let clock: DateFormatter = {
@@ -140,6 +148,15 @@ final class Player {
         case "caption":
             var s = Step(.caption)
             s.text = try quoted(rest)
+            emit(s, author: true)
+        case "view":
+            let depths: [String: Double] = ["plain": 0, "skin": 1, "inside": 2]
+            guard let depth = depths[rest] else { throw fail("'view skin|inside|plain'") }
+            guard reading != nil else {
+                throw fail("'view' shows the machine's heat: set it first (cpu · skin · fans)")
+            }
+            var s = Step(.thermal)
+            s.depth = depth
             emit(s, author: true)
         case "poster":
             guard rest.isEmpty, !steps.contains(where: { $0.kind == .poster }) else {
@@ -252,10 +269,20 @@ final class Player {
     }
 
     private func worldStep(_ text: String) throws {
+        var heat = reading ?? Reading(parts: [:], surface: nil, fans: [0])
         for fact in text.components(separatedBy: " · ") {
             let w = fact.split(separator: " ").map(String.init)
             guard w.count >= 2 else { throw fail("unknown step '\(fact)'") }
             switch (w[0], w[1]) {
+            case ("cpu", let c), ("gpu", let c), ("ssd", let c):
+                guard let v = Double(c) else { throw fail("'\(w[0]) <°C>'") }
+                heat.parts[w[0]] = v
+            case ("skin", let c):
+                guard let v = Double(c) else { throw fail("'skin <°C>'") }
+                heat.surface = v
+            case ("fans", let p):
+                guard let v = Double(p), (0...100).contains(v) else { throw fail("'fans 0-100'") }
+                heat.fans = [v / 100]
             case ("clock", let t): try guarded(setClock(t), "'clock HH:MM'")
             case ("battery", let n):
                 guard let p = Int(n), (0...100).contains(p) else { throw fail("'battery 0-100'") }
@@ -301,6 +328,12 @@ final class Player {
         }
         // The change itself shows first, then what awake does about it.
         showWorld(author: true)
+        if heat != reading, !heat.parts.isEmpty || heat.surface != nil {
+            reading = heat
+            var s = Step(.thermal)
+            s.thermal = heat
+            emit(s, author: false)
+        }
         // What the daemon hears: IOPS, thermal and poll ticks. An asleep Mac hears nothing.
         if !world.asleep { machine.tick() }
     }
