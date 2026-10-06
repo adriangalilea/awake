@@ -15,6 +15,8 @@ helper="$dest/Contents/Helpers/awake-notifier.app"
 mkdir -p "$dest/Contents/MacOS" "$dest/Contents/Resources"
 ditto .build/release/awake "$dest/Contents/MacOS/awake"
 ditto Resources/awake.icns "$dest/Contents/Resources/awake.icns"
+# The glass icon (CFBundleIconName); the icns above is its flat fallback.
+ditto Resources/Assets.car "$dest/Contents/Resources/Assets.car"
 # The agent skill ships in the bundle; `awake skill install` links it into the
 # agents on the Mac, so an upgrade of the app is an upgrade of the skill.
 ditto skill "$dest/Contents/Resources/skill"

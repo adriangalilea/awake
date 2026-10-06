@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- the cup: a bowl with a flat foot, its rim an ellipse, the coffee inside. -->
+  <defs>
+    <linearGradient id="brew" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffc76a"/>
+      <stop offset="1" stop-color="#e89b3c"/>
+    </linearGradient>
+    <linearGradient id="coffee" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a4a18"/>
+      <stop offset="1" stop-color="#b8672a"/>
+    </linearGradient>
+  </defs>
+  <g transform="scale(8.5333) translate(-4 -4)">
+    <path d="M33 62C33 81 38 93.5 45.5 97.6Q49 100 53.5 100H66.5Q71 100 74.5 97.6C82 93.5 87 81 87 62z" fill="url(#brew)"/>
+    <ellipse cx="60" cy="62" rx="27" ry="6.5" fill="#ffd48a"/>
+    <ellipse cx="60" cy="62.6" rx="23" ry="4.6" fill="url(#coffee)"/>
+  </g>
+</svg>

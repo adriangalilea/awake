@@ -6,6 +6,8 @@
 	<string>awake</string>
 	<key>CFBundleIconFile</key>
 	<string>awake</string>
+	<key>CFBundleIconName</key>
+	<string>awake</string>
 	<key>CFBundleIdentifier</key>
 	<string>garden.untitled.awake</string>
 	<key>CFBundleName</key>

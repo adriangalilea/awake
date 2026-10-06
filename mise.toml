@@ -9,7 +9,7 @@
 #   release    `ship release` (swift-utils): signed, notarized dmg → tag → GitHub Release → publish → cask ($TAP)
 #   ship-check what would stop a release right now, each blocked gate with its real answer
 #   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden ($GARDEN)
-#   icon       render Resources/awake.icns + icon.png from scripts/icon.svg (rsvg-convert)
+#   icon       awake.icon (Icon Composer, SVG layers) → Assets.car + awake.icns + icon.png (swift-utils' mark)
 # Every compiling task runs under scripts/locked.sh (the build mutex);
 # scripts/assemble.sh builds the .app for install AND release, one implementation.
 
@@ -67,6 +67,8 @@ scripts/locked.sh swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
 # where UI and GARDEN name those checkouts, in the ui studio and the garden.
 [tasks.scene]
 description = "Compile scenes/*.scene into web timelines + art.json (here, the ui studio, the garden)"
+# art.json carries the app icon, Resources/icon.png.
+depends = ["icon"]
 run = '''
 scripts/locked.sh swift build --product awake-scene > /dev/null
 set -- --out scenes
@@ -104,21 +106,18 @@ done
 pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FILM:-*}.webp "$PWD"/dist/films/${FILM:-*}.mp4
 '''
 
+# One drawing, every icon file: awake.icon (Icon Composer's package, its
+# layers SVG) is the icon; swift-utils' `mark` compiles the glass
+# Assets.car, the flat awake.icns (the notifier's too) and icon.png (the web
+# surface and the scenes' art) from it, build output never committed
+# (actool's is not byte-stable), so every task that bundles or shows the icon
+# depends on this one. `mark preview awake.icon` is the review.
 [tasks.icon]
-description = "Render Resources/awake.icns + icon.png from scripts/icon.svg (the web surface and the scenes want the flat PNG too)"
-sources = ["scripts/icon.svg"]
-outputs = ["Resources/awake.icns", "Resources/icon.png"]
-run = '''
-set -euo pipefail
-set_dir=$(mktemp -d)/awake.iconset
-mkdir -p "$set_dir"
-for pt in 16 32 128 256 512; do
-  rsvg-convert -w $pt -h $pt scripts/icon.svg -o "$set_dir/icon_${pt}x${pt}.png"
-  rsvg-convert -w $((pt * 2)) -h $((pt * 2)) scripts/icon.svg -o "$set_dir/icon_${pt}x${pt}@2x.png"
-done
-iconutil -c icns "$set_dir" -o Resources/awake.icns
-rsvg-convert -w 512 -h 512 scripts/icon.svg -o Resources/icon.png
-'''
+description = "Compile awake.icon: Resources/Assets.car + awake.icns + icon.png (swift-utils' mark)"
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
+sources = ["awake.icon/icon.json", "awake.icon/Assets/*.svg"]
+outputs = ["Resources/Assets.car", "Resources/awake.icns", "Resources/icon.png"]
+run = "mark build awake.icon --out Resources --png Resources/icon.png"
 
 [tasks.glyphlab]
 description = "Menu-bar preview of candidate icon states (click a variant to cycle) — scripts/glyphlab.swift"
@@ -216,6 +215,7 @@ ship release --name awake --app "$DIST/awake.app" \
 # Every gate the release would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
+depends = ["icon"]
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
 run = '''
 ship check --name awake --app "$DIST/awake.app" --assemble "scripts/assemble.sh $DIST/awake.app" \

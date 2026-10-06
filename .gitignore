@@ -2,3 +2,7 @@
 .swiftpm/
 dist/
 .DS_Store
+# mise icon compiles these from awake.icon (actool's output is not byte-stable)
+Resources/Assets.car
+Resources/awake.icns
+Resources/icon.png
