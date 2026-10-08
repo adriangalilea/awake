@@ -531,6 +531,16 @@ public final class StateMachine {
         log("update check \(on ? "on (daily)" : "off")")
     }
 
+    /// This install's random code (`Config.installID`), made and saved the
+    /// first time a check asks for it.
+    public func installID() -> String {
+        if let id = config.installID { return id }
+        let id = UUID().uuidString.lowercased()
+        config.installID = id
+        world.saveConfig(config)
+        return id
+    }
+
     public var updateCheckDue: Bool {
         config.updateCheck && (config.nextUpdateCheck.map { $0 <= world.now } ?? true)
     }

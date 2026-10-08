@@ -228,17 +228,20 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static let feed = URL(string: "https://awake.untitled.garden/appcast.xml")!
     private var updateInFlight = false
 
-    /// One GET a day against the owned appcast (`updates off` stops it). The
-    /// GET is the whole payload: the server counts it as an active install for
-    /// the day under a salted IP hash and 302s to the feed. If the feed names a
-    /// newer version than this bundle, say so once, through the notifier, and
-    /// point at brew. Failure reschedules an hour out and is log-only.
+    /// One GET a day against the owned appcast (`updates off` stops it),
+    /// carrying only the install's random code (`install=`): the server counts
+    /// it as an active install for the day under a salted hash and 302s to the
+    /// feed. If the feed names a newer version than this bundle, say so once,
+    /// through the notifier, and point at brew. Failure reschedules an hour out
+    /// and is log-only.
     private func checkForUpdate() {
         guard let running = Self.runningVersion, machine.updateCheckDue, !updateInFlight else {
             return
         }
         updateInFlight = true
-        var req = URLRequest(url: Self.feed, timeoutInterval: 10)
+        var feed = URLComponents(url: Self.feed, resolvingAgainstBaseURL: false)!
+        feed.queryItems = [URLQueryItem(name: "install", value: machine.installID())]
+        var req = URLRequest(url: feed.url!, timeoutInterval: 10)
         req.setValue("awake/\(running)", forHTTPHeaderField: "User-Agent")
         URLSession.shared.dataTask(with: req) { data, response, error in
             let latest: String? = {

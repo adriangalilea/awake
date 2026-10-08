@@ -85,7 +85,7 @@ This is why it is a daemon and not a one-shot command: a command that has exited
 
 ## Update check
 
-Once a day the daemon fetches `awake.untitled.garden/appcast.xml`. That GET is the entire payload: no identifier, no usage data, nothing about your Mac. The server keeps a salted, non-reversible hash of the caller's IP for that day so the garden can count active installs (never the IP itself), and answers with the feed. If the feed names a newer version than the one you run, awake says so once, on screen, and points at `brew upgrade --cask awake`. `awake status` shows the same nudge. `awake updates off` stops the check, and with it the ping.
+Once a day the daemon fetches `awake.untitled.garden/appcast.xml`. The only thing it sends is a random code awake made the first time it checked (`?install=…`, kept in `~/.local/state/awake/config.json`): no usage data, nothing about you or your Mac. The server keeps a salted, non-reversible hash of that code so the garden can count active installs without counting one Mac twice, and answers with the feed. If the feed names a newer version than the one you run, awake says so once, on screen, and points at `brew upgrade --cask awake`. `awake status` shows the same nudge. `awake updates off` stops the check, and with it the ping.
 
 ## Notifications
 

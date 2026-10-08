@@ -254,9 +254,13 @@ public struct Config: Codable, Equatable, Sendable {
     /// Empty (the default) means screen only.
     public var notifyCommand: String
     /// The daily version check against awake.untitled.garden/appcast.xml. One
-    /// GET a day, no payload; the server keeps a salted hash of the caller's IP
-    /// for that day to count active installs (never the IP). Off = silent.
+    /// GET a day carrying only `installID`; the server keeps a salted hash of
+    /// it to count active installs. Off = silent.
     public var updateCheck: Bool
+    /// A random code made the first time this install checks for updates,
+    /// sent with each check so copies in use are counted without counting a
+    /// Mac twice. Made of nothing about the person or the Mac.
+    public var installID: String?
     /// When the next check is due (nil = due now). Success schedules a day
     /// ahead, failure an hour, so a flaky network is not hammered every tick.
     public var nextUpdateCheck: Date?
@@ -286,6 +290,7 @@ public struct Config: Codable, Equatable, Sendable {
         nextUpdateCheck = try c.decodeIfPresent(Date.self, forKey: .nextUpdateCheck)
         latestVersion = try c.decodeIfPresent(String.self, forKey: .latestVersion)
         updateAnnounced = try c.decodeIfPresent(String.self, forKey: .updateAnnounced)
+        installID = try c.decodeIfPresent(String.self, forKey: .installID)
     }
 
     public static let floorRange = 0...50
