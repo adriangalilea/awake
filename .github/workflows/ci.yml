@@ -12,11 +12,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   check:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v6
-      - uses: jdx/mise-action@v3
-      - run: mise run check
-      - run: git diff --exit-code
+    uses: adriangalilea/ci/.github/workflows/mise.yml@c2ba9058dbad2cc8589da7419f2bd8b30ad9334a # v1.2.0
+    permissions:
+      contents: read
