@@ -126,7 +126,6 @@ run = "swift scripts/glyphlab.swift"
 [tasks.install]
 description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the agent skill (Claude Code, Codex), the launchd agent"
 depends = ["icon"]
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
 run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
@@ -137,14 +136,15 @@ mkdir -p "$prefix/bin" "$HOME/Library/Logs/awake"
 stage="$APP.staging"
 rm -rf "$stage"
 scripts/assemble.sh "$stage"
-# A certificate signature is REQUIRED: SMAppService refuses to register an agent
-# from an ad-hoc bundle (kSMErrorInvalidSignature), and TCC ties notification
-# permission to a stable signature (ad-hoc identities churn every rebuild). A
-# local install is a development build: the team's Apple Development identity
-# (`ship identity`; Developer ID is a release's alone). A fork names its own team.
+# Developer ID is REQUIRED: SMAppService refuses to register an agent from an
+# ad-hoc bundle (kSMErrorInvalidSignature), and launchd did not run the agent of
+# an Apple Development build either (2026-10-20, undiagnosed). TCC ties
+# notification permission to a stable signature (ad-hoc identities churn every
+# rebuild). Discovered, never hardcoded, so a fork signs with its own certificate.
 # Inner first, then outer: a nested app must carry its own signature before the
 # enclosing bundle is sealed over it.
-sign_id=$(ship identity --team G387QW47LV)
+sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
+test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain: SMAppService refuses ad-hoc bundles"; exit 1; }
 codesign --force --sign "$sign_id" "$stage/Contents/Helpers/awake-notifier.app"
 codesign --force --sign "$sign_id" "$stage"
 rm -rf "$APP.old"
