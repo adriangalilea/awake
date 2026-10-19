@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         // Keymap: the system-wide hotkey path (Carbon, permission-free).
         // Grant: the Standing vocabulary + the notification reach probe.
-        .package(url: "https://github.com/adriangalilea/swift-utils", from: "0.18.0")
+        .package(url: "https://github.com/adriangalilea/swift-utils", .upToNextMinor(from: "0.26.0"))
     ],
     targets: [
         // The engine. Knows the kernel flag, assertions, battery, sessions. Knows no UI;
