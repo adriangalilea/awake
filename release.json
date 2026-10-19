@@ -1,0 +1,6 @@
+{
+  "app": "awake",
+  "trees": [{ "name": "awake", "path": "." }],
+  "script": "scripts/release",
+  "artifacts": ["dist"]
+}

@@ -6,7 +6,7 @@
 #   uninstall  remove binary, symlink, launchd agent (sudoers grant: `awake grant --remove`)
 #   clean      remove the build directory
 #   notes      draft notes/$VERSION.md from the commits (you then rewrite it)
-#   release    `ship release` (swift-utils): signed, notarized dmg → tag → GitHub Release → publish → cask ($TAP)
+#   release    `authz release` (one approval: the notarized dmg of these commits), then `ship publish` (swift-utils): tag → GitHub Release → publish → cask ($TAP)
 #   ship-check what would stop a release right now, each blocked gate with its real answer
 #   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden ($GARDEN)
 #   icon       awake.icon (Icon Composer, SVG layers) → Assets.car + awake.icns + icon.png (swift-utils' mark)
@@ -114,7 +114,7 @@ pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FI
 # depends on this one. `mark preview awake.icon` is the review.
 [tasks.icon]
 description = "Compile awake.icon: Resources/Assets.car + awake.icns + icon.png (swift-utils' mark)"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
 sources = ["awake.icon/icon.json", "awake.icon/Assets/*.svg"]
 outputs = ["Resources/Assets.car", "Resources/awake.icns", "Resources/icon.png"]
 run = "mark build awake.icon --out Resources --png Resources/icon.png"
@@ -126,6 +126,7 @@ run = "swift scripts/glyphlab.swift"
 [tasks.install]
 description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the agent skill (Claude Code, Codex), the launchd agent"
 depends = ["icon"]
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
 run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
@@ -136,14 +137,14 @@ mkdir -p "$prefix/bin" "$HOME/Library/Logs/awake"
 stage="$APP.staging"
 rm -rf "$stage"
 scripts/assemble.sh "$stage"
-# Developer ID is REQUIRED: SMAppService refuses to register an agent from an
-# ad-hoc bundle (kSMErrorInvalidSignature), and TCC ties notification permission
-# to a stable signature (ad-hoc identities churn every rebuild). Discovered, never
-# hardcoded, so a fork signs with its own certificate.
+# A certificate signature is REQUIRED: SMAppService refuses to register an agent
+# from an ad-hoc bundle (kSMErrorInvalidSignature), and TCC ties notification
+# permission to a stable signature (ad-hoc identities churn every rebuild). A
+# local install is a development build: the team's Apple Development identity
+# (`ship identity`; Developer ID is a release's alone). A fork names its own team.
 # Inner first, then outer: a nested app must carry its own signature before the
 # enclosing bundle is sealed over it.
-sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
-test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain: SMAppService refuses ad-hoc bundles"; exit 1; }
+sign_id=$(ship identity --team G387QW47LV)
 codesign --force --sign "$sign_id" "$stage/Contents/Helpers/awake-notifier.app"
 codesign --force --sign "$sign_id" "$stage"
 rm -rf "$APP.old"
@@ -195,32 +196,40 @@ git-cliff --config .github/cliff.toml --unreleased --tag "$VERSION" -o "$notes"
 echo "drafted $notes — REWRITE it for humans, then commit it"
 '''
 
-# Notarization is a credentialed act, so releasing is a LOCAL command: the
-# certificate is in this keychain and the App Store Connect key is named by
-# this machine's environment (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER),
-# neither of which belongs in CI. CI's job is the 0-warning gate, nothing more.
+# A release is signed only after a person approves its exact commits: `authz
+# release` (authz.space) asks once, builds a fresh clone of them with
+# scripts/release (release.json), the Developer ID and the App Store Connect
+# key reaching that build alone, and leaves the notarized dmg in $DIST. Then
+# `ship publish` (swift-utils), from this checkout, refuses unless that dmg is
+# the release of exactly these commits, and tags, pushes and runs the
+# channels. CI's job is the 0-warning gate, nothing more.
 [tasks.release]
-description = "ship release: gates, Developer ID, notarized dmg, tag, GitHub Release, publish, cask (LOCAL: needs the Developer ID + APPSTORE_KEY)"
-depends = ["icon", "check"]
+description = "authz release (one approval: the notarized dmg of these commits), then ship publish: tag, GitHub Release, publish, cask"
+depends = ["check", "ship-check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
 # (mise check) never releases, so it never builds it.
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
 run = '''
-ship release --name awake --app "$DIST/awake.app" \
-  --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
-  --sign Contents/Helpers/awake-notifier.app \
-  --github --after "mise run publish" --cask
+authz release
+ship publish --name awake --app "$DIST/awake.app" --github --after "mise run publish" --cask
 '''
 
-# Every gate the release would hold, each blocked one with its real answer.
+# Inside `authz release` only (scripts/release): its keychain and key are in
+# the environment, and ship build refuses anywhere else.
+[tasks."release:build"]
+description = "ship build, inside authz release: signed, notarized dmg in $DIST"
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
+run = '''
+ship build --team G387QW47LV --name awake --app "$DIST/awake.app" \
+  --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
+  --sign Contents/Helpers/awake-notifier.app
+'''
+
+# Every gate publishing would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
-depends = ["icon"]
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.20.0", filter_bins = "mark,ship" } }
-run = '''
-ship check --name awake --app "$DIST/awake.app" --assemble "scripts/assemble.sh $DIST/awake.app" \
-  --github --after "mise run publish" --cask
-'''
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.0", filter_bins = "mark,ship" } }
+run = 'ship check --name awake --app "$DIST/awake.app" --github --cask'
 
 # The garden half of a release, ship's --after: the dmg behind the counted
 # download URL, the notes on the surface. It runs BEFORE the cask bump: the
