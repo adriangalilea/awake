@@ -194,10 +194,30 @@ public struct Claim: Codable, Equatable, Identifiable, Sendable {
 
 }
 
+/// Which awake this process is: the release (`garden.untitled.awake`,
+/// Developer ID, installed by its release or the cask) or a development build
+/// (`garden.untitled.awake.dev`, "awake Dev", signed with the Apple Development
+/// certificate by `mise run install`; an unbundled debug run counts as
+/// development too). Two apps to macOS on purpose: SMAppService pins an agent
+/// to the certificate type that first registered it (untitled docs/apple.md
+/// "Development builds"). The notifier helper (`<app>.notifier`) answers with
+/// its app's identity, so both read the same state.
+public enum Identity {
+    public static let release = "garden.untitled.awake"
+    public static let bundleID: String = {
+        guard let id = Bundle.main.bundleIdentifier else { return release + ".dev" }
+        return id.hasSuffix(".notifier") ? String(id.dropLast(".notifier".count)) : id
+    }()
+    public static let dev = bundleID != release
+    /// A root's name for this build: a development build keeps its own (`-dev`),
+    /// so iterating never reads or rewrites the release's claims, config or logs.
+    public static func root(_ base: String) -> String { dev ? base + "-dev" : base }
+}
+
 /// Everything on disk lives here. Single place, no scattered paths.
 public enum Paths {
     public static let stateDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".local/state/awake")
+        .appendingPathComponent(".local/state/" + Identity.root("awake"))
     public static let claimsFile = stateDir.appendingPathComponent("claims.json")
     /// The human's suspend switch, its own file: orthogonal to the claim set and
     /// absent whenever the switch is off, so claims.json keeps its shape.
@@ -207,16 +227,17 @@ public enum Paths {
     /// notifier can read it (the daemon is a launchd agent); the daemon renders it.
     public static let notificationsFile = stateDir.appendingPathComponent("notifications.json")
     /// The notifications row in System Settings belongs to the app that posts.
-    public static let notifierBundleID = "garden.untitled.awake.notifier"
+    public static let notifierBundleID = Identity.bundleID + ".notifier"
     public static let socket = stateDir.appendingPathComponent("awake.sock")
+    /// Shared by both builds: it admits exactly two pmset commands, whoever runs them.
     public static let sudoers = "/etc/sudoers.d/awake"
-    public static let launchdLabel = "garden.untitled.awake"
+    public static let launchdLabel = Identity.bundleID
     /// Where a hand-installed agent under our label would live; the real one is
     /// registered from inside the bundle (Agent.swift) and removes this on sight.
     public static let userAgentPlist = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/LaunchAgents/\(launchdLabel).plist")
     public static let logDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Logs/awake")
+        .appendingPathComponent("Library/Logs/" + Identity.root("awake"))
     public static let serviceLog = logDir.appendingPathComponent("service.log")
 
     public static func ensureStateDir() {

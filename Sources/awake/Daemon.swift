@@ -8,7 +8,7 @@ import Security
 import SwiftUI
 
 /// The resident brain: owns the StateMachine, the menu bar item, the socket, the
-/// timers. Run by launchd (`garden.untitled.awake`), KeepAlive restarts it on crash
+/// timers. Run by launchd (its bundle id, Identity), KeepAlive restarts it on crash
 /// and startup reconciliation makes that restart honest. Every word it shows comes
 /// from AwakeSurface; this file only draws it and routes the clicks.
 @MainActor
@@ -218,10 +218,11 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Update check
 
-    /// The bundle's own version; nil for the bare development binary, which
-    /// therefore never phones anywhere.
+    /// The bundle's own version; nil for a development build (awake Dev or the
+    /// bare binary, Identity), which therefore never phones anywhere and never
+    /// counts as an install.
     static let runningVersion: String? =
-        Bundle.main.bundleIdentifier == nil
+        Identity.dev
         ? nil
         : Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
 

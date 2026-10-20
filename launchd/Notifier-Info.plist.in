@@ -7,9 +7,9 @@
 	<key>CFBundleIconFile</key>
 	<string>awake</string>
 	<key>CFBundleIdentifier</key>
-	<string>garden.untitled.awake.notifier</string>
+	<string>__BUNDLE_ID__.notifier</string>
 	<key>CFBundleName</key>
-	<string>awake</string>
+	<string>__NAME__</string>
 	<key>CFBundleDisplayName</key>
 	<string>awake</string>
 	<key>CFBundlePackageType</key>

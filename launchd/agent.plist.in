@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>garden.untitled.awake</string>
+	<string>__BUNDLE_ID__</string>
 	<key>BundleProgram</key>
 	<string>Contents/MacOS/awake</string>
 	<key>ProgramArguments</key>

@@ -2,8 +2,9 @@
 # (`mise <task>` from the repo root):
 #   build      the binary (release)
 #   check      format + compile everything, debug — the FAST typecheck (0 warnings)
-#   install    build + install binary, asleep symlink, launchd agent; restart daemon
-#   uninstall  remove binary, symlink, launchd agent (sudoers grant: `awake grant --remove`)
+#   install    build + install awake Dev (Apple Development, its own agent/state/logs), the symlinks; stops the release's agent
+#   install:release  the release from dist/ with its agent; stops awake Dev's
+#   uninstall  remove both apps, symlinks, launchd agents (sudoers grant: `awake grant --remove`)
 #   clean      remove the build directory
 #   notes      draft notes/$VERSION.md from the commits (you then rewrite it)
 #   release    `authz release` (one approval: the notarized dmg of these commits), then `ship publish` (swift-utils): tag → GitHub Release → publish → cask ($TAP)
@@ -19,28 +20,35 @@
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
 VERSION = "0.9.2"
-LABEL = "garden.untitled.awake"
-# The .app lives in ~/Applications; the CLI is a symlink into the bundle so
-# daemon and CLI stay ONE binary.
+# Two apps to macOS (Sources/AwakeKit/Claim.swift, Identity): the release, and
+# the development build local installs make ("awake Dev", Apple Development,
+# its own agent, state and logs). The .app lives in ~/Applications; the CLI is
+# a symlink into the bundle so daemon and CLI stay ONE binary. One awake runs
+# at a time: whichever the `awake` symlink points into.
 APP = "{{ env.HOME }}/Applications/awake.app"
 APPBIN = "{{ env.HOME }}/Applications/awake.app/Contents/MacOS/awake"
+DEV_ID = "garden.untitled.awake.dev"
+DEV_APP = "{{ env.HOME }}/Applications/awake Dev.app"
+DEV_APPBIN = "{{ env.HOME }}/Applications/awake Dev.app/Contents/MacOS/awake"
 DIST = "dist"
 
 [tasks.build]
 description = "Build the awake binary (release)"
 run = "scripts/locked.sh swift build -c release"
 
-# The dev loop that COEXISTS with the cask install: the resident agent is
-# the cask's (brew upgrade owns it); iterating runs the DEBUG daemon in the
-# foreground against the real socket, with the agent stopped for exactly
-# that long and restored on exit (^C included). `mise run install` remains
-# the full local override for when the dev build should BE the install.
+# The dev loop: the DEBUG daemon in the foreground, the installed awake's
+# agent (whichever `awake` points into) stopped for exactly that long and
+# restored on exit (^C included). An unbundled run is a development build: it
+# keeps its own state (~/.local/state/awake-dev, its own socket), so it never
+# touches the release's claims. `mise run install` makes the development
+# build the installed one.
 [tasks.dev]
-description = "Foreground DEBUG daemon; stops the installed agent, restores it on exit"
+description = "Foreground DEBUG daemon (its own state); stops the installed agent, restores it on exit"
 run = '''
 scripts/locked.sh swift build
-"$APPBIN" agent uninstall
-trap '"$APPBIN" agent install' EXIT
+active=$(readlink "${PREFIX:-$HOME/.local}/bin/awake")
+"$active" agent uninstall
+trap '"$active" agent install' EXIT
 .build/debug/awake daemon
 '''
 
@@ -123,38 +131,41 @@ run = "mark build awake.icon --out Resources --png Resources/icon.png"
 description = "Menu-bar preview of candidate icon states (click a variant to cycle) — scripts/glyphlab.swift"
 run = "swift scripts/glyphlab.swift"
 
+# The installed experience of the development build: "awake Dev" in
+# ~/Applications with its own agent, state and logs, `awake`/`asleep` pointing
+# into it. The release's agent is stopped first (its app and state untouched;
+# its claims wait there until `mise run install:release` swaps back).
 [tasks.install]
-description = "Build + install ~/Applications/awake.app, the awake/asleep symlinks, the agent skill (Claude Code, Codex), the launchd agent"
+description = "Build + install awake Dev (Apple Development) with its agent, symlinks and skill; stops the release's agent"
 depends = ["icon"]
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
 run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
-mkdir -p "$prefix/bin" "$HOME/Library/Logs/awake"
+mkdir -p "$prefix/bin"
+test -x "$APPBIN" && "$APPBIN" agent uninstall || true
 # Assembled and signed beside the live bundle, then swapped in with one rename,
 # the way Homebrew moves a bundle: the running daemon restarts into whatever sits
-# at $APP, and an image caught unsigned mid-install is one launchd refuses.
-stage="$APP.staging"
+# at the path, and an image caught unsigned mid-install is one launchd refuses.
+stage="$DEV_APP.staging"
 rm -rf "$stage"
-scripts/assemble.sh "$stage"
-# Developer ID is REQUIRED: SMAppService refuses to register an agent from an
-# ad-hoc bundle (kSMErrorInvalidSignature), and launchd did not run the agent of
-# an Apple Development build either (2026-10-20, undiagnosed). TCC ties
-# notification permission to a stable signature (ad-hoc identities churn every
-# rebuild). Discovered, never hardcoded, so a fork signs with its own certificate.
-# Inner first, then outer: a nested app must carry its own signature before the
-# enclosing bundle is sealed over it.
-sign_id=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)
-test -n "$sign_id" || { echo "no 'Developer ID Application' certificate in the keychain: SMAppService refuses ad-hoc bundles"; exit 1; }
-codesign --force --sign "$sign_id" "$stage/Contents/Helpers/awake-notifier.app"
-codesign --force --sign "$sign_id" "$stage"
-rm -rf "$APP.old"
-if [ -d "$APP" ]; then mv "$APP" "$APP.old"; fi
-mv "$stage" "$APP"
-rm -rf "$APP.old"
+BUNDLE_ID="$DEV_ID" BUNDLE_NAME="awake Dev" scripts/assemble.sh "$stage"
+# A certificate signature (never ad hoc: SMAppService refuses an ad-hoc bundle,
+# kSMErrorInvalidSignature, and TCC ties the notification permission to a stable
+# signature): the team's Apple Development identity, so permissions hold across
+# rebuilds. Inner first, then outer: a nested app carries its own signature
+# before the enclosing bundle is sealed over it.
+id=$(ship identity --team G387QW47LV)
+codesign --force --sign "$id" "$stage/Contents/Helpers/awake-notifier.app"
+codesign --force --sign "$id" "$stage"
+rm -rf "$DEV_APP.old"
+if [ -d "$DEV_APP" ]; then mv "$DEV_APP" "$DEV_APP.old"; fi
+mv "$stage" "$DEV_APP"
+rm -rf "$DEV_APP.old"
 # CLI = symlinks into the bundle; the binary re-execs through the resolved path
 # (main.swift), so Bundle.main is the app and the defaults domain is the daemon's.
-ln -sf "$APPBIN" "$prefix/bin/awake"
-ln -sf "$APPBIN" "$prefix/bin/asleep"
+ln -sf "$DEV_APPBIN" "$prefix/bin/awake"
+ln -sf "$DEV_APPBIN" "$prefix/bin/asleep"
 # The agent skill, linked to the REPO here so editing it updates the live skill in
 # every agent at once (a released app links its bundled copy: `awake skill install`).
 for skills in "$HOME/.claude/skills" "${CODEX_HOME:-$HOME/.codex}/skills"; do
@@ -162,21 +173,45 @@ for skills in "$HOME/.claude/skills" "${CODEX_HOME:-$HOME/.codex}/skills"; do
   mkdir -p "$skills"
   ln -sfn "$PWD/skill" "$skills/awake"
 done
-echo "installed $APP (+ awake, asleep symlinks, the agent skill)"
-# The binary owns the agent, not this file: a double click and the first CLI call
-# after a Homebrew install register it the same way, one implementation.
+echo "installed $DEV_APP (+ awake, asleep symlinks, the agent skill)"
+# The binary owns the agent, not this file.
+"$DEV_APPBIN" agent install
+'''
+
+# Back to the release (what `mise run release` built into $DIST, of exactly
+# these commits): awake Dev's agent stopped, the release installed with its
+# agent, `awake`/`asleep` pointing into it.
+[tasks."install:release"]
+description = "Install the release from dist/ with its agent; stops awake Dev's agent"
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+run = '''
+ship released
+[ -d "$DIST/awake.app" ] || { echo "no $DIST/awake.app: mise run release"; exit 1; }
+prefix="${PREFIX:-$HOME/.local}"
+test -x "$DEV_APPBIN" && "$DEV_APPBIN" agent uninstall || true
+stage="$APP.staging"
+rm -rf "$stage"
+ditto "$DIST/awake.app" "$stage"
+rm -rf "$APP.old"
+if [ -d "$APP" ]; then mv "$APP" "$APP.old"; fi
+mv "$stage" "$APP"
+rm -rf "$APP.old"
+ln -sf "$APPBIN" "$prefix/bin/awake"
+ln -sf "$APPBIN" "$prefix/bin/asleep"
+echo "installed $APP (+ awake, asleep symlinks)"
 "$APPBIN" agent install
 '''
 
 [tasks.uninstall]
-description = "Remove app, symlinks, launchd agent (sudoers grant: awake grant --remove)"
+description = "Remove both apps (release and awake Dev), their agents and the symlinks (sudoers grant: awake grant --remove)"
 run = '''
 prefix="${PREFIX:-$HOME/.local}"
 # Unregister while the bundle exists: SMAppService resolves the agent through it.
-test -x "$APPBIN" && "$APPBIN" agent uninstall
-rm -rf "$APP"
+test -x "$APPBIN" && "$APPBIN" agent uninstall || true
+test -x "$DEV_APPBIN" && "$DEV_APPBIN" agent uninstall || true
+rm -rf "$APP" "$DEV_APP"
 rm -f "$prefix/bin/awake" "$prefix/bin/asleep"
-echo "removed app, symlinks, launchd agent. Sudoers grant: sudo rm /etc/sudoers.d/awake"
+echo "removed both apps, symlinks, launchd agents. Sudoers grant: sudo rm /etc/sudoers.d/awake"
 '''
 
 [tasks.clean]
