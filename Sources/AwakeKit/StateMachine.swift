@@ -102,6 +102,12 @@ public final class StateMachine {
     /// Ending claims is a separate, explicit act (`asleep`, "End all claims").
     public private(set) var suspendedSince: Date?
     public var suspended: Bool { suspendedSince != nil }
+    /// The process is leaving (a SIGTERM, an upgrade or move handing the agent to
+    /// another copy): the effect is released, the claims stay on disk for the next
+    /// daemon, and nothing re-arms or judges them here again. Without it, a tick
+    /// in the seconds before the stop reads the released flag as an outside writer
+    /// and ends every claim the next daemon was meant to re-arm.
+    public private(set) var parked = false
     public private(set) var config: Config
     /// Every read and write outside the machine goes through here.
     public let world: any World
@@ -307,12 +313,10 @@ public final class StateMachine {
     /// user-facing ends go through `end`, which clears. Reboots are guarded by
     /// `Claim.isValid`'s boot-time check, not by clearing here.
     public func park() {
-        guard !claims.isEmpty else { return }
-        let kept = claims
-        claims = []
-        _ = apply()
-        claims = kept  // disk still holds them; only the effect was released
-        log("parked \(kept)")
+        guard !parked else { return }
+        parked = true
+        _ = apply()  // wants nothing now; disk still holds the claims
+        if !claims.isEmpty { log("parked \(claims)") }
     }
 
     /// UI-preference setters: persisted so right-click/hotkey muscle memory survives
@@ -404,6 +408,7 @@ public final class StateMachine {
     /// The heartbeat: expiry, pid liveness, battery floor, LPM, external writers.
     /// Runs every poll tick, on power-source change, and before every status render.
     public func tick() {
+        guard !parked else { return }
         let flagOn = world.sleepDisabled()
         // A human at the terminal setting the flag by hand is the one voice that
         // outranks the suspend switch: adopt the flag AND lift the switch.
@@ -574,10 +579,11 @@ public final class StateMachine {
     /// Computes the delta against what the kernel/process currently does and
     /// executes exactly that delta.
     private func apply() -> LidResult {
-        // Suspended: intent stands, effect is nothing. Same choke point, so the
-        // delta logic below releases exactly what is held, and nothing else changes.
+        // Suspended or parked: intent stands, effect is nothing. Same choke point,
+        // so the delta logic below releases exactly what is held, and nothing else
+        // changes.
         var wanted =
-            suspended
+            suspended || parked
             ? Set<Mode>()
             : claims.reduce(into: Set<Mode>()) { $0.formUnion($1.effectiveModes) }
         // The standing "keep display on" preference rides ANY effect, whoever owns

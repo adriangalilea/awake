@@ -71,6 +71,9 @@ extension StateMachine {
         case .setUpdateCheck(let on):
             setUpdateCheck(on)
             return Reply(ok: true, status: status())
+        case .handBack:
+            park()
+            return Reply(ok: true, status: status())
         }
     }
 

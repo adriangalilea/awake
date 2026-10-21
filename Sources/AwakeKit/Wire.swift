@@ -20,6 +20,11 @@ public enum Command: Codable, Sendable {
     case suspend
     case resume
     case setUpdateCheck(Bool)
+    /// Asked by AppInstallations before it unregisters the agent (a fresh
+    /// registration, a move, `agent uninstall`), which stops the daemon with no
+    /// SIGTERM: sleep restored, the claims kept on disk for the copy that takes
+    /// over, and nothing re-armed until the daemon is gone.
+    case handBack
 }
 
 public struct Reply: Codable, Sendable {

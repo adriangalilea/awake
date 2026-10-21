@@ -29,9 +29,10 @@ ditto Resources/Assets.car "$dest/Contents/Resources/Assets.car"
 ditto skill "$dest/Contents/Resources/skill"
 stamp() { sed -e "s|__VERSION__|$VERSION|g" -e "s|__BUNDLE_ID__|$id|g" -e "s|__NAME__|$name|g" "$1"; }
 stamp launchd/Info.plist.in > "$dest/Contents/Info.plist"
-# The agent's plist lives IN the bundle, registered by SMAppService (Agent.swift):
-# launchd runs whatever image sits at the bundle's path, so it follows upgrades.
-# Per-user paths cannot appear in it; the daemon points its own output at its log.
+# The agent's plist lives IN the bundle, registered through AppInstallations
+# (Installation.swift): launchd follows the bundle it registered, never the path,
+# so the daemon's watch hands the agent to an upgraded copy. Per-user paths
+# cannot appear in it; the daemon points its own output at its log.
 mkdir -p "$dest/Contents/Library/LaunchAgents"
 stamp launchd/agent.plist.in > "$dest/Contents/Library/LaunchAgents/$id.plist"
 mkdir -p "$helper/Contents/MacOS" "$helper/Contents/Resources"

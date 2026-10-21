@@ -1,6 +1,8 @@
+import AppKit
 import AwakeKit
 import AwakeSurface
 import Foundation
+import PermissionGrants
 
 // Run as the bundle's own executable, always. Invoked through a symlink
 // (~/.local/bin/awake, /opt/homebrew/bin/asleep), Bundle.main is the symlink's
@@ -18,17 +20,30 @@ if let exe = Bundle.main.executablePath {
 
 let rawArgs = CommandLine.arguments
 let invocation = URL(fileURLWithPath: rawArgs[0]).lastPathComponent
-let args = Array(rawArgs.dropFirst())
+// AppInstallations' own launch arguments (a copy a move opened to turn the agent
+// on, or one an old agent named stale) are the app's launch, never a verb.
+let args = AppInstallation.appArguments(Array(rawArgs.dropFirst()))
 
-// LaunchServices (a double click, Spotlight, `open`) starts the bundle with no
-// arguments and launchd as parent. That launch means "make awake run": register
-// the agent, or restart it into this image. Output goes to the service log, since
-// nobody reads an LS-launched process's stderr.
+// LaunchServices (a double click, Spotlight, `open`, a move or a hand-over) starts
+// the bundle with no verb and launchd as parent. That launch means "make awake
+// run": the agent turned on from this copy (moved into Applications first when
+// it runs from elsewhere), the one approval included. Output goes to the service
+// log, since nobody reads an LS-launched process's stderr.
 if args.isEmpty, getppid() == 1, Bundle.main.bundleIdentifier != nil {
     Paths.redirectOutputToServiceLog()
-    log("launched by LaunchServices, installing the agent")
-    Agent.install()
-    exit(0)
+    log("launched by LaunchServices: turning the agent on")
+    // A hand-over's launch registers the agent for this copy and exits inside.
+    let installation = AppInstallation.ImageWatch.start(
+        jobs: [.awake], links: Installation.links)
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    Task { @MainActor in
+        _ = await Installation.turnOn()
+        log("agent: \(AppInstallation.Job.awake.words)")
+        withExtendedLifetime(installation) {}
+        exit(0)
+    }
+    app.run()
 }
 
 // The verbs that act on this Mac directly; everything else talks to the daemon.

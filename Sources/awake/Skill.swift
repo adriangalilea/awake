@@ -7,8 +7,8 @@ import Foundation
 /// (`~/.claude/skills`) and Codex (`$CODEX_HOME/skills`, `~/.codex` by default). A link,
 /// not a copy, so upgrading the app upgrades the skill in every agent at once. Only an
 /// earlier link is ever replaced: a real folder at that path is the person's own, and
-/// is refused, never overwritten. When the app is deleted, the daemon's self-uninstall
-/// takes the links with it (`unlink(into:)`), so none is left dangling.
+/// is refused, never overwritten. The links are AppInstallations' (`Installation.links`):
+/// re-pointed at a new copy, removed when the app is deleted.
 enum Skill {
     struct Home {
         let agent: String
@@ -109,15 +109,6 @@ enum Skill {
             guard target(h.link) != nil else { continue }
             try? FileManager.default.removeItem(at: h.link)
             print(SkillWords.line(h.agent, .removed(shown(h.link))))
-        }
-    }
-
-    /// The links that point into `bundle`, removed: the app they lead to is gone.
-    static func unlink(into bundle: String) {
-        for h in homes {
-            guard let to = target(h.link), to.hasPrefix(bundle + "/") else { continue }
-            try? FileManager.default.removeItem(at: h.link)
-            log("removed the \(h.agent) skill link into the deleted app")
         }
     }
 }

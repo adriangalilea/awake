@@ -232,10 +232,6 @@ public enum Paths {
     /// Shared by both builds: it admits exactly two pmset commands, whoever runs them.
     public static let sudoers = "/etc/sudoers.d/awake"
     public static let launchdLabel = Identity.bundleID
-    /// Where a hand-installed agent under our label would live; the real one is
-    /// registered from inside the bundle (Agent.swift) and removes this on sight.
-    public static let userAgentPlist = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/LaunchAgents/\(launchdLabel).plist")
     public static let logDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/" + Identity.root("awake"))
     public static let serviceLog = logDir.appendingPathComponent("service.log")

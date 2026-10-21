@@ -11,11 +11,11 @@ enum Client {
     }
 
     /// One round trip, bringing the daemon up when it isn't reachable: a fresh
-    /// `brew install` registers the agent here, a wedged daemon (alive but not
-    /// accepting) is restarted, a job launchd gave up on is registered again.
+    /// `brew install` registers the agent here, and a wedged daemon (registered,
+    /// not answering) or a registration for another copy is registered afresh.
     static func send(_ cmd: Command) -> Reply {
         if let r = Wire.roundTrip(cmd) { return r }
-        if Agent.registered { Agent.restart() } else { Agent.install() }
+        Agent.install()
         for _ in 0..<50 {
             usleep(100_000)
             if let r = Wire.roundTrip(cmd) { return r }

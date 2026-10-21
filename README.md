@@ -46,7 +46,7 @@ cd awake && mise run install     # needs mise (brew install mise); the verbs liv
 awake grant
 ```
 
-Either path installs the app and puts `awake` and `asleep` on your PATH. The daemon that owns the state machine is a launch agent the app registers itself (SMAppService, listed under Login Items), the first time you open awake or run any `awake` command. From then on it keeps itself current: after an upgrade it restarts into the new version, and if you delete the app it restores normal sleep and stops itself.
+Either path installs the app and puts `awake` and `asleep` on your PATH. The daemon that owns the state machine is a launch agent the app registers itself (listed under Login Items), the first time you open awake or run any `awake` command; opened from the dmg or a download, awake first asks whether to install for everyone or just you and moves itself there. From then on it keeps itself current: after an upgrade the new version takes over with your claims intact, and if you delete the app it restores normal sleep, moves its settings and logs to the Trash, removes its links and stops itself.
 
 `awake grant` asks once, with the native authorization prompt, to install a sudoers rule scoped to exactly two commands:
 
@@ -54,7 +54,7 @@ Either path installs the app and puts `awake` and `asleep` on your PATH. The dae
 <you> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 0, /usr/bin/pmset -a disablesleep 1
 ```
 
-That is the whole privilege footprint. `awake grant --remove` deletes it, `mise run uninstall` removes everything else.
+That is the whole privilege footprint. `awake grant --remove` deletes it; deleting the app removes everything else.
 
 ## With coding agents
 
