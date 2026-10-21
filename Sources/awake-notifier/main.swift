@@ -46,17 +46,15 @@ guard probe || !message.isEmpty else {
 enum Notifier {
     /// The daemon's log, appended: an LS-launched app has no stderr anyone reads.
     static func log(_ text: String) {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
-            "Library/Logs/awake")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: Paths.logDir, withIntermediateDirectories: true)
         let line = "\(ISO8601DateFormatter().string(from: Date())) notifier: \(text)\n"
-        let url = dir.appendingPathComponent("service.log")
-        if let h = try? FileHandle(forWritingTo: url) {
+        if let h = try? FileHandle(forWritingTo: Paths.serviceLog) {
             h.seekToEndOfFile()
             h.write(Data(line.utf8))
             try? h.close()
         } else {
-            try? Data(line.utf8).write(to: url)
+            try? Data(line.utf8).write(to: Paths.serviceLog)
         }
     }
 
@@ -76,67 +74,51 @@ enum Notifier {
         }
     }
 
-    /// Record what the settings say, in the one place the daemon reads.
-    static func record(_ settings: UNNotificationSettings) {
-        guard let reach = PermissionGrant.Notifications.reach(of: settings) else {
-            log(
-                "unknown authorization status \(settings.authorizationStatus.rawValue), not recorded"
-            )
-            return
+    /// The reach as the settings say now, recorded in the one place the daemon reads.
+    static func record() async -> PermissionGrant.Notifications.Reach? {
+        guard let reach = await PermissionGrant.Notifications.reach() else {
+            log("an authorization status this build does not know, not recorded")
+            return nil
         }
         if NotificationStore.load() != reach { log("notification reach: \(reach.rawValue)") }
         NotificationStore.save(reach)
+        return reach
     }
 
-    static func probe() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            record(settings)
-            exit(0)
-        }
-    }
-
-    static func deliver(_ message: String, prime: Bool) {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            record(settings)
-            switch settings.authorizationStatus {
-            case .notDetermined:
-                // The one moment the system prompt appears. With --prime this is
-                // install time; otherwise it is the first real event, still "in
-                // context" (the banner that follows IS the reason).
-                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
-                    granted, error in
-                    if let error {
-                        log("authorization failed: \(error)")
-                        exit(1)
-                    }
-                    // The answer changed the settings; record them as they now are
-                    // (granted can still be silenced, alert style None).
-                    UNUserNotificationCenter.current().getNotificationSettings { after in
-                        record(after)
-                        guard granted else {
-                            log("notifications DENIED at the prompt")
-                            exit(2)
-                        }
-                        post(message)
-                    }
-                }
-            case .authorized, .provisional, .ephemeral:
-                if prime { exit(0) }  // already answered; priming has nothing to say
-                post(message)
-            case .denied:
-                if !prime { log("notifications denied for awake; message dropped: \(message)") }
+    static func deliver(_ message: String, prime: Bool) async {
+        switch await record() {
+        case .notAsked:
+            // The one moment the system prompt appears. With --prime this is
+            // install time; otherwise it is the first real event, still "in
+            // context" (the banner that follows IS the reason).
+            await PermissionGrant.Notifications.ask(options: [.alert, .sound])
+            // The answer changed the settings; record them as they now are
+            // (granted can still be silenced, alert style None).
+            guard let after = await record(), after != .denied, after != .notAsked else {
+                log("notifications DENIED at the prompt")
                 exit(2)
-            @unknown default:
-                log(
-                    "unknown authorization status \(settings.authorizationStatus.rawValue); posting anyway"
-                )
-                post(message)
             }
+            post(message)
+        case .allowed, .silenced:
+            if prime { exit(0) }  // already answered; priming has nothing to say
+            post(message)
+        case .denied:
+            if !prime { log("notifications denied for awake; message dropped: \(message)") }
+            exit(2)
+        case nil:
+            log("posting without a known reach")
+            post(message)
         }
     }
 }
 
-if probe { Notifier.probe() } else { Notifier.deliver(message, prime: prime) }
+Task {
+    if probe {
+        _ = await Notifier.record()
+        exit(0)
+    }
+    await Notifier.deliver(message, prime: prime)
+}
 
 // Block on the run loop until a completion handler exits us. The ceiling is a
 // first-run prompt left unanswered, not a normal path.
