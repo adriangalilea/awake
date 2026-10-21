@@ -66,7 +66,16 @@ run = '''
 mise run format
 scripts/locked.sh swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
 .build/debug/awake-scene scenes/*.scene > /dev/null || .build/debug/awake-scene scenes/*.scene
+mise run lock-in
 '''
+
+# Permissions and the app's jobs only through swift-utils' AppInstallations
+# (and PermissionGrants): a direct SMAppService call or a permission read
+# fails the gate.
+[tasks.lock-in]
+description = "no hand-rolled install or permission code (grant lint)"
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.0", filter_bins = "grant,ship,mark,since" } }
+run = "grant lint Sources"
 
 # THE SHOWCASE. scenes/*.scene are stories played through the real engine against a
 # scripted Mac (Sources/awake-scene); each compiles to a timeline @ag/macos-session
