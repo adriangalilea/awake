@@ -1,5 +1,5 @@
 import Foundation
-import Grant
+import PermissionGrants
 
 /// A wake mechanism. `.lid` is the kernel flag (needs the sudoers grant); the others
 /// are IOKit power assertions held by the daemon process.
@@ -388,12 +388,12 @@ public enum SuspendStore {
 /// Written by the notifier on every run, read by the daemon. nil = never recorded
 /// (a bare dev binary has no notifier), rendered as unknown.
 public enum NotificationStore {
-    public static func load() -> NotificationReach? {
+    public static func load() -> PermissionGrant.Notifications.Reach? {
         guard let data = try? Data(contentsOf: Paths.notificationsFile) else { return nil }
-        return try! JSONDecoder().decode(NotificationReach.self, from: data)
+        return try! JSONDecoder().decode(PermissionGrant.Notifications.Reach.self, from: data)
     }
 
-    public static func save(_ reach: NotificationReach) {
+    public static func save(_ reach: PermissionGrant.Notifications.Reach) {
         Paths.ensureStateDir()
         try! JSONEncoder().encode(reach).write(to: Paths.notificationsFile, options: .atomic)
     }

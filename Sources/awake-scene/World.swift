@@ -1,8 +1,7 @@
 import AwakeKit
 import Foundation
 import IOKit.pwr_mgt
-
-import enum Grant.NotificationReach  // scoped: Grant's own Claim would shadow AwakeKit's
+import PermissionGrants
 
 /// A Mac that does what the script says. Everything the engine reads comes from
 /// here, so a scene is the real machine living through an invented evening.
@@ -19,7 +18,7 @@ final class ScriptedWorld: World {
     /// holding it). Opening the lid wakes it.
     var asleep = false
     var grant = true
-    var reach: NotificationReach = .allowed
+    var reach: PermissionGrant.Notifications.Reach = .allowed
 
     private var flag = false
     private var nextAssertion: IOPMAssertionID = 1
@@ -59,5 +58,5 @@ final class ScriptedWorld: World {
     func saveSuspended(_ since: Date?) { suspended = since }
     func loadConfig() -> Config { config }
     func saveConfig(_ config: Config) { self.config = config }
-    func notificationReach() -> NotificationReach? { reach }
+    func notificationReach() -> PermissionGrant.Notifications.Reach? { reach }
 }

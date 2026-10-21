@@ -1,7 +1,6 @@
 import AwakeKit
 import Foundation
-
-import enum Grant.Notifications  // scoped: Grant's own Claim would shadow AwakeKit's
+import PermissionGrants
 
 /// The CLI as two pure functions: argv → `Verb`, and (verb, reply) → `Output`. The
 /// binary does the IO between them (the socket, the terminal); a scene runs the same
@@ -417,7 +416,7 @@ public enum CLI {
         }
         if st.thermalCritical { env.append("critical heat, lid refused") }
         if !env.isEmpty { lines.append([Span("   " + env.joined(separator: " · "), .muted)]) }
-        let notifications = Notifications.standing(st.notifications)
+        let notifications = PermissionGrant.Notifications.standing(st.notifications)
         if notifications.grade == .broken, let note = notifications.note {
             lines.append([
                 Span("   notifications off: ", .warn),

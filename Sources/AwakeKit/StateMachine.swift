@@ -1,6 +1,6 @@
 import Foundation
-import Grant
 import IOKit.pwr_mgt
+import PermissionGrants
 
 /// Why claims ended without being asked to. One reason per end event; the daemon
 /// composes the human message from (reason, ended claims, remaining claims).
@@ -77,8 +77,8 @@ public struct Status: Codable, Equatable, Sendable {
     /// `ProcessInfo.thermalState == .critical`: lid claims are ended and refused.
     public var thermalCritical: Bool
     /// The notifier's last recorded reach; nil = never recorded (no notifier).
-    /// Clients render `Notifications.standing(_:)` of it, nothing rawer.
-    public var notifications: NotificationReach?
+    /// Clients render `PermissionGrant.Notifications.standing(_:)` of it, nothing rawer.
+    public var notifications: PermissionGrant.Notifications.Reach?
     /// The human's "let it sleep" switch (right-click, hotkey, `awake suspend`):
     /// every claim is kept but inert until resumed. nil = not suspended.
     public var suspendedSince: Date?

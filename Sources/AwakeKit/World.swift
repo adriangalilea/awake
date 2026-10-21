@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
-import Grant
 import IOKit.pwr_mgt
+import PermissionGrants
 
 /// Everything the machine reads or changes outside itself. `HostWorld` is this Mac;
 /// a scene (`awake-scene`) plays the same engine against a scripted one, so every
@@ -32,7 +32,7 @@ public protocol World: AnyObject {
     func loadConfig() -> Config
     func saveConfig(_ config: Config)
     /// The notifier's last recorded reach; nil = never recorded.
-    func notificationReach() -> NotificationReach?
+    func notificationReach() -> PermissionGrant.Notifications.Reach?
 }
 
 /// This Mac: IOKit, pmset, sysctl, and the state files under `Paths`.
@@ -65,5 +65,7 @@ public final class HostWorld: World {
     public func saveSuspended(_ since: Date?) { SuspendStore.save(since) }
     public func loadConfig() -> Config { Config.load() }
     public func saveConfig(_ config: Config) { config.save() }
-    public func notificationReach() -> NotificationReach? { NotificationStore.load() }
+    public func notificationReach() -> PermissionGrant.Notifications.Reach? {
+        NotificationStore.load()
+    }
 }

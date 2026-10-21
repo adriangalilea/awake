@@ -2,9 +2,7 @@ import AwakeKit
 import AwakeSurface
 import Foundation
 import Keymap
-
-import enum Grant.NotificationReach
-import enum Grant.Notifications  // scoped: Grant's own Claim would shadow AwakeKit's
+import PermissionGrants
 
 struct ScriptError: Error {
     let line: Int
@@ -300,7 +298,7 @@ final class Player {
                 guard let p = Int(n) else { throw fail("'floor <percent>'") }
                 machine.setFloor(p)
             case ("notifications", let r):
-                let reach: [String: NotificationReach] = [
+                let reach: [String: PermissionGrant.Notifications.Reach] = [
                     "allowed": .allowed, "denied": .denied, "silenced": .silenced,
                     "not-asked": .notAsked,
                 ]
@@ -351,7 +349,7 @@ final class Player {
         let rows = Menu.rows(
             MenuInput(
                 status: st, now: world.now, sudoers: Menu.sudoersStanding(ready: world.grant),
-                notifications: Notifications.standing(world.reach),
+                notifications: PermissionGrant.Notifications.standing(world.reach),
                 lastMinutes: machine.config.lastMinutes))
         menu = visible(rows)
         hovered = nil

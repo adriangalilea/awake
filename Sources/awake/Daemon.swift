@@ -4,6 +4,7 @@ import AwakeSurface
 import Foundation
 import IOKit.ps
 import Keymap
+import PermissionGrants
 import Security
 import SwiftUI
 
@@ -32,7 +33,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// grant is missing, the menu leads with the setup row, and any keep-awake
     /// gesture raises the admin sheet instead of failing into a notification
     /// nobody granted permission to show (the first-run dead-icon bug).
-    private var grantReady = true
+    private(set) var grantReady = true
     private var grantInFlight = false
     private var keymapStore: KeymapStore<AwakeAction>!
     private var hotkeys: GlobalHotkeys<AwakeAction>!
@@ -363,8 +364,8 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Menu.rows(
             MenuInput(
                 status: openStatus!, now: Date(),
-                sudoers: Menu.sudoersStanding(ready: grantReady),
-                notifications: NotifierGrant().standing,
+                sudoers: PermissionGrant.lidClosed.standing,
+                notifications: PermissionGrant.notifier.standing,
                 lastMinutes: machine.config.lastMinutes))
     }
 
@@ -434,7 +435,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case nil: break
         case .offerGrant(let minutes): offerGrant(retryMinutes: minutes)
         case .notify(let message): Daemon.screenNotify(message)
-        case .notificationsGrant: NotifierGrant().act()
+        case .notificationsGrant: PermissionGrant.notifier.act()
         case .quit: quit()
         }
     }
@@ -442,7 +443,7 @@ final class Daemon: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// The in-app grant flow: the same native admin sheet as `awake grant`,
     /// off-main (osascript blocks until the user decides). Success retries the
     /// gesture that triggered it; cancel is the user's answer and stays quiet.
-    private func offerGrant(retryMinutes: Int?) {
+    func offerGrant(retryMinutes: Int?) {
         guard !grantInFlight else { return }
         grantInFlight = true
         Task.detached {

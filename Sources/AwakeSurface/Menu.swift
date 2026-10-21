@@ -1,7 +1,6 @@
 import AwakeKit
 import Foundation
-
-import enum Grant.Standing  // scoped: Grant's own Claim would shadow AwakeKit's
+import PermissionGrants
 
 /// What a menu row does when clicked. The daemon performs it on the live machine
 /// (`StateMachine.perform`); a scene performs it on a scripted one.
@@ -59,12 +58,13 @@ public struct MenuRow: Equatable, Sendable {
 public struct MenuInput: Sendable {
     public var status: Status
     public var now: Date
-    public var sudoers: Standing
-    public var notifications: Standing
+    public var sudoers: PermissionGrant.Standing
+    public var notifications: PermissionGrant.Standing
     public var lastMinutes: Int
 
     public init(
-        status: Status, now: Date, sudoers: Standing, notifications: Standing, lastMinutes: Int
+        status: Status, now: Date, sudoers: PermissionGrant.Standing,
+        notifications: PermissionGrant.Standing, lastMinutes: Int
     ) {
         self.status = status
         self.now = now
@@ -81,9 +81,9 @@ public enum Menu {
     ]
     public static let floors = [0, 10, 15, 20, 30, 50]
 
-    /// The sudoers grant in Grant's vocabulary: one click raises the system's own
-    /// admin sheet, so missing is an offer, never a failure.
-    public static func sudoersStanding(ready: Bool) -> Standing {
+    /// The sudoers grant as a standing: one click raises the system's own admin
+    /// sheet, so missing is an offer, never a failure.
+    public static func sudoersStanding(ready: Bool) -> PermissionGrant.Standing {
         ready
             ? .good
             : .askable(
@@ -226,7 +226,9 @@ public enum Menu {
         return rows
     }
 
-    private static func grantRow(_ title: String, _ standing: Standing, _ action: MenuAction)
+    private static func grantRow(
+        _ title: String, _ standing: PermissionGrant.Standing, _ action: MenuAction
+    )
         -> MenuRow
     {
         .item(

@@ -1,7 +1,7 @@
 import AppKit
 import AwakeKit
 import Foundation
-import Grant
+import PermissionGrants
 
 /// The nested notifier app, the daemon's only way onto the screen. A banner is the
 /// app LS-launched per message (`open -g -n`: background, fresh instance every time
@@ -37,27 +37,30 @@ enum Notifier {
     }
 }
 
-/// Notifications as swift-utils Grant sees any permission: the helper reads the
-/// reach (the daemon cannot), NotificationStore carries it here, and the standing
-/// is the module's one mapping. Askable asks through the helper (the prompt belongs
-/// to the app that posts); broken opens the HELPER's row in System Settings.
-struct NotifierGrant: Grant {
-    let symbol = "bell.badge"
-    let title = "Notifications"
-    let why = "Safety-net ends (battery floor, Low Power Mode, critical heat) say so on screen."
-    let required = false
+extension PermissionGrant {
+    /// Notifications through the nested helper: the helper reads the reach (the
+    /// daemon cannot), NotificationStore carries it here, and the standing is the
+    /// module's one mapping. Askable asks through the helper (the prompt belongs to
+    /// the app that posts); broken opens the HELPER's row in System Settings.
+    static let notifier = PermissionGrant(
+        title: "Notifications",
+        why: "Safety-net ends (battery floor, Low Power Mode, critical heat) say so on screen.",
+        symbol: "bell.badge", required: false,
+        standing: { Notifier.standing },
+        act: {
+            switch Notifier.standing.grade {
+            case .askable: Notifier.launch(["--prime"])
+            case .broken:
+                PermissionGrant.Notifications.openSettings(bundleID: Paths.notifierBundleID)
+            case .good, .unknown: break
+            }
+        })
+}
 
-    var standing: Standing {
-        Notifier.app == nil
+extension Notifier {
+    static var standing: PermissionGrant.Standing {
+        app == nil
             ? .unknown(note: "Development binary: no notifier, messages go to the log.")
-            : Notifications.standing(NotificationStore.load())
-    }
-
-    func act() {
-        switch standing.grade {
-        case .askable: Notifier.launch(["--prime"])
-        case .broken: Notifications.openSettings(bundleID: Paths.notifierBundleID)
-        case .good, .unknown: break
-        }
+            : PermissionGrant.Notifications.standing(NotificationStore.load())
     }
 }

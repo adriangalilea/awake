@@ -1,6 +1,6 @@
 import AwakeKit
 import Foundation
-import Grant
+import PermissionGrants
 import UserNotifications
 
 // awake-notifier: the notification hop, and the only eyes on its own permission.
@@ -78,7 +78,7 @@ enum Notifier {
 
     /// Record what the settings say, in the one place the daemon reads.
     static func record(_ settings: UNNotificationSettings) {
-        guard let reach = Notifications.reach(of: settings) else {
+        guard let reach = PermissionGrant.Notifications.reach(of: settings) else {
             log(
                 "unknown authorization status \(settings.authorizationStatus.rawValue), not recorded"
             )

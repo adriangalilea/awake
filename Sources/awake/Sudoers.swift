@@ -1,5 +1,18 @@
 import AwakeKit
+import AwakeSurface
 import Foundation
+import PermissionGrants
+
+extension PermissionGrant {
+    /// The sudoers rule the lid flag needs: read from the daemon's live probe,
+    /// its act the admin sheet.
+    static let lidClosed = PermissionGrant(
+        title: "Lid-closed awake",
+        why: "Keeps the Mac working with the lid shut, for the claims you allow.",
+        symbol: "laptopcomputer",
+        standing: { Menu.sudoersStanding(ready: Daemon.shared.grantReady) },
+        act: { Daemon.shared.offerGrant(retryMinutes: nil) })
+}
 
 /// The privilege boundary, solofan's shape: one native auth sheet installs a sudoers
 /// drop-in scoped to exactly the two pmset invocations, validated by visudo BEFORE it
