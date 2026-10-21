@@ -7,7 +7,7 @@
 #   uninstall  remove both apps, symlinks, launchd agents (sudoers grant: `awake grant --remove`)
 #   clean      remove the build directory
 #   notes      draft notes/$VERSION.md from the commits (you then rewrite it)
-#   release    `authz release` (one approval: the notarized dmg of these commits), then `ship publish` (swift-utils): tag → GitHub Release → publish → cask ($TAP)
+#   release    `ship release` (one approval: the notarized dmg of these commits), then `ship publish` (swift-utils): tag → GitHub Release → publish → cask ($TAP)
 #   ship-check what would stop a release right now, each blocked gate with its real answer
 #   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden ($GARDEN)
 #   icon       awake.icon (Icon Composer, SVG layers) → Assets.car + awake.icns + icon.png (swift-utils' mark)
@@ -122,7 +122,7 @@ pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FI
 # depends on this one. `mark preview awake.icon` is the review.
 [tasks.icon]
 description = "Compile awake.icon: Resources/Assets.car + awake.icns + icon.png (swift-utils' mark)"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 sources = ["awake.icon/icon.json", "awake.icon/Assets/*.svg"]
 outputs = ["Resources/Assets.car", "Resources/awake.icns", "Resources/icon.png"]
 run = "mark build awake.icon --out Resources --png Resources/icon.png"
@@ -138,7 +138,7 @@ run = "swift scripts/glyphlab.swift"
 [tasks.install]
 description = "Build + install awake Dev (Apple Development) with its agent, symlinks and skill; stops the release's agent"
 depends = ["icon"]
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
@@ -183,7 +183,7 @@ echo "installed $DEV_APP (+ awake, asleep symlinks, the agent skill)"
 # agent, `awake`/`asleep` pointing into it.
 [tasks."install:release"]
 description = "Install the release from dist/ with its agent; stops awake Dev's agent"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 ship released
 [ -d "$DIST/awake.app" ] || { echo "no $DIST/awake.app: mise run release"; exit 1; }
@@ -231,29 +231,30 @@ git-cliff --config .github/cliff.toml --unreleased --tag "$VERSION" -o "$notes"
 echo "drafted $notes — REWRITE it for humans, then commit it"
 '''
 
-# A release is signed only after a person approves its exact commits: `authz
-# release` (authz.space) asks once, builds a fresh clone of them with
+# A release is signed only after a person approves its exact commits: `ship
+# release` (swift-utils) asks once through Authz, builds its working clone of
+# them with
 # scripts/release (release.json), the Developer ID and the App Store Connect
 # key reaching that build alone, and leaves the notarized dmg in $DIST. Then
 # `ship publish` (swift-utils), from this checkout, refuses unless that dmg is
 # the release of exactly these commits, and tags, pushes and runs the
 # channels. CI's job is the 0-warning gate, nothing more.
 [tasks.release]
-description = "authz release (one approval: the notarized dmg of these commits), then ship publish: tag, GitHub Release, publish, cask"
+description = "ship release (one approval: the notarized dmg of these commits), then ship publish: tag, GitHub Release, publish, cask"
 depends = ["check", "ship-check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
 # (mise check) never releases, so it never builds it.
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
-authz release
+ship release
 ship publish --name awake --app "$DIST/awake.app" --github --after "mise run publish" --cask
 '''
 
-# Inside `authz release` only (scripts/release): its keychain and key are in
+# Inside `ship release` only (scripts/release): its keychain and key are in
 # the environment, and ship build refuses anywhere else.
 [tasks."release:build"]
-description = "ship build, inside authz release: signed, notarized dmg in $DIST"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+description = "ship build, inside ship release: signed, notarized dmg in $DIST"
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 ship build --team G387QW47LV --name awake --app "$DIST/awake.app" \
   --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
@@ -263,7 +264,7 @@ ship build --team G387QW47LV --name awake --app "$DIST/awake.app" \
 # Every gate publishing would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.29.3", filter_bins = "mark,ship" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.36.0", filter_bins = "grant,ship,mark,since" } }
 run = 'ship check --name awake --app "$DIST/awake.app" --github --cask'
 
 # The garden half of a release, ship's --after: the dmg behind the counted

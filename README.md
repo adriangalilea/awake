@@ -127,7 +127,7 @@ mise film            # film each scene (WebP + mp4) and publish it to the CDN
 
 The films above are not screen recordings. Each `scenes/*.scene` is a short story (the lid closes, the battery drops, you open the menu) that `awake-scene` plays through awake's real engine against a scripted Mac. Every menu row, terminal line and banner in them is what awake itself produces, and a scene that clicks a row the menu no longer has fails to compile.
 
-A release is built from a fresh clone of commits a person approved, then signed and notarized with keys that never touch this repo or CI; CI only runs `mise check`.
+A release is built from a clone of exactly the commits a person approved, then signed and notarized with keys that never touch this repo or CI; CI only runs `mise check`.
 
 `notes/<version>.md` is the release notes, written by hand and committed. git-cliff only drafts it. The dmg is served through `awake.untitled.garden/releases/<file>` (the cask points there too), which counts each download before redirecting to the CDN; GitHub keeps a copy of the asset.
 

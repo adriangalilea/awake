@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# scripts/release <clone>: what `authz release` runs (release.json) after a
-# person approved these exact commits, in a fresh clone of them: the icon,
+# scripts/release <clone>: what `ship release` runs (release.json) after a
+# person approved these exact commits, in the release's working clone of them: the icon,
 # then `ship build` (swift-utils) signs from the release's own keychain,
 # notarizes and makes the dmg in dist/. Publishing is `mise run release`'s
 # second half, from the checkout.
