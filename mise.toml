@@ -19,7 +19,7 @@
 # A mac app has a native version field, so the manifest is truth here and the
 # tag is derived from it (the inverse of a Swift library, where the tag IS the
 # version because SwiftPM has no manifest field).
-VERSION = "0.9.2"
+VERSION = "0.10.0"
 # Two apps to macOS (Sources/AwakeKit/Claim.swift, Identity): the release, and
 # the development build local installs make ("awake Dev", Apple Development,
 # its own agent, state and logs). The .app lives in ~/Applications; the CLI is
