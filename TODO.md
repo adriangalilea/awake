@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] **Delete the `~/Library/LaunchAgents` migration** (`Agent.removeUserAgentPlist` + its `stop()`, `Paths.userAgentPlist`). Trigger: every Mac that installed awake from source before 0.8.0 has run `mise run install` of 0.8.0 or later once; the migration prints `removed …/garden.untitled.awake.plist` when it fires. Done on the M5 (2026-09-30). Homebrew installs never need it: the pre-0.8 cask's own uninstall step deletes that plist during the upgrade.
+- [ ] **`main.swift`'s `byInstallation` becomes `AppInstallation.isInstallationLaunch(given)`** once swift-utils exports it (the patch after 0.37.14): the same fact, owned by the module that defines the arguments. The LaunchServices half (`getppid() == 1`, no verb) stays awake's.
 
 - [ ] **Demo gif in the README.** The one thing that explains the lid-closed case faster than three paragraphs.
 
