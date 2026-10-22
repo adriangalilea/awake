@@ -25,7 +25,7 @@ let invocation = URL(fileURLWithPath: rawArgs[0]).lastPathComponent
 // app's launch, never a verb.
 let given = Array(rawArgs.dropFirst())
 let args = AppInstallation.appArguments(given)
-let byInstallation = args.count != given.count
+let byInstallation = AppInstallation.isInstallationLaunch(given)
 
 // The app's launch means "make awake run": the agent turned on from this copy
 // (moved into Applications first when it runs from elsewhere), the one approval

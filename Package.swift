@@ -15,7 +15,7 @@ let package = Package(
         // PermissionGrants: the Standing vocabulary + the notification reach probe.
         // AppInstallations: the app's whole life (the agent as its job, the move into
         // Applications, upgrade and delete).
-        .package(url: "https://github.com/adriangalilea/swift-utils", .upToNextMinor(from: "0.37.14"))
+        .package(url: "https://github.com/adriangalilea/swift-utils", .upToNextMinor(from: "0.37.15"))
     ],
     targets: [
         // The engine. Knows the kernel flag, assertions, battery, sessions. Knows no UI;
