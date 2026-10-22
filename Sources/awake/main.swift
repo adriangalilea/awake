@@ -21,15 +21,19 @@ if let exe = Bundle.main.executablePath {
 let rawArgs = CommandLine.arguments
 let invocation = URL(fileURLWithPath: rawArgs[0]).lastPathComponent
 // AppInstallations' own launch arguments (a copy a move opened to turn the agent
-// on, or one an old agent named stale) are the app's launch, never a verb.
-let args = AppInstallation.appArguments(Array(rawArgs.dropFirst()))
+// on, or one an old agent runs as its child to take the agent over) are the
+// app's launch, never a verb.
+let given = Array(rawArgs.dropFirst())
+let args = AppInstallation.appArguments(given)
+let byInstallation = args.count != given.count
 
-// LaunchServices (a double click, Spotlight, `open`, a move or a hand-over) starts
-// the bundle with no verb and launchd as parent. That launch means "make awake
-// run": the agent turned on from this copy (moved into Applications first when
-// it runs from elsewhere), the one approval included. Output goes to the service
-// log, since nobody reads an LS-launched process's stderr.
-if args.isEmpty, getppid() == 1, Bundle.main.bundleIdentifier != nil {
+// The app's launch means "make awake run": the agent turned on from this copy
+// (moved into Applications first when it runs from elsewhere), the one approval
+// included. It is either AppInstallations' (its arguments say so, whoever the
+// parent) or LaunchServices' (a double click, Spotlight, `open`: no verb, launchd
+// as parent). Without either, no verb is the CLI's bare `awake`. Output goes to
+// the service log, since nobody reads such a process's stderr.
+if args.isEmpty, byInstallation || getppid() == 1, Bundle.main.bundleIdentifier != nil {
     Paths.redirectOutputToServiceLog()
     log("launched by LaunchServices: turning the agent on")
     // A hand-over's launch registers the agent for this copy and exits inside.
