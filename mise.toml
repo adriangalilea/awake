@@ -74,7 +74,7 @@ mise run lock-in
 # fails the gate.
 [tasks.lock-in]
 description = "no hand-rolled install or permission code (grant lint)"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = "grant lint Sources"
 
 # THE SHOWCASE. scenes/*.scene are stories played through the real engine against a
@@ -131,7 +131,7 @@ pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FI
 # depends on this one. `mark preview awake.icon` is the review.
 [tasks.icon]
 description = "Compile awake.icon: Resources/Assets.car + awake.icns + icon.png (swift-utils' mark)"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 sources = ["awake.icon/icon.json", "awake.icon/Assets/*.svg"]
 outputs = ["Resources/Assets.car", "Resources/awake.icns", "Resources/icon.png"]
 run = "mark build awake.icon --out Resources --png Resources/icon.png"
@@ -147,7 +147,7 @@ run = "swift scripts/glyphlab.swift"
 [tasks.install]
 description = "Build + install awake Dev (Apple Development) with its agent, symlinks and skill; stops the release's agent"
 depends = ["icon"]
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 mise run build
 prefix="${PREFIX:-$HOME/.local}"
@@ -192,19 +192,23 @@ echo "installed $DEV_APP (+ awake, asleep symlinks, the agent skill)"
 # agent, `awake`/`asleep` pointing into it.
 [tasks."install:release"]
 description = "Install the release from dist/ with its agent; stops awake Dev's agent"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 ship released
-[ -d "$DIST/awake.app" ] || { echo "no $DIST/awake.app: mise run release"; exit 1; }
+# The release leaves the app zipped, never a runnable copy at rest beside the
+# installed one; it is unpacked out of sight and moved into place.
+zip="$DIST/awake.app.zip"
+[ -f "$zip" ] || { echo "no $zip: mise run release"; exit 1; }
 prefix="${PREFIX:-$HOME/.local}"
 test -x "$DEV_APPBIN" && "$DEV_APPBIN" agent uninstall || true
-stage="$APP.staging"
-rm -rf "$stage"
-ditto "$DIST/awake.app" "$stage"
+stage="$(mktemp -d)"
+ditto -x -k "$zip" "$stage"
 rm -rf "$APP.old"
 if [ -d "$APP" ]; then mv "$APP" "$APP.old"; fi
-mv "$stage" "$APP"
-rm -rf "$APP.old"
+mv "$stage/awake.app" "$APP"
+rm -rf "$APP.old" "$stage"
+# The installed copy is the only record LaunchServices keeps of it.
+ship installed "$APP"
 ln -sf "$APPBIN" "$prefix/bin/awake"
 ln -sf "$APPBIN" "$prefix/bin/asleep"
 echo "installed $APP (+ awake, asleep symlinks)"
@@ -253,7 +257,7 @@ description = "ship release (one approval: the notarized dmg of these commits), 
 depends = ["check", "ship-check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
 # (mise check) never releases, so it never builds it.
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 ship release
 ship publish --name awake --app "$DIST/awake.app" --github --after "mise run publish" --cask
@@ -263,7 +267,7 @@ ship publish --name awake --app "$DIST/awake.app" --github --after "mise run pub
 # the environment, and ship build refuses anywhere else.
 [tasks."release:build"]
 description = "ship build, inside ship release: signed, notarized dmg in $DIST"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 ship build --team G387QW47LV --name awake --app "$DIST/awake.app" \
   --assemble "mise run build && scripts/assemble.sh $DIST/awake.app" \
@@ -273,7 +277,7 @@ ship build --team G387QW47LV --name awake --app "$DIST/awake.app" \
 # Every gate publishing would hold, each blocked one with its real answer.
 [tasks.ship-check]
 description = "ship check: what would stop a release right now"
-tools = { "spm:adriangalilea/swift-utils" = { version = "0.37.1", filter_bins = "grant,ship,mark,since" } }
+tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = 'ship check --name awake --app "$DIST/awake.app" --github --cask'
 
 # The garden half of a release, ship's --after: the dmg behind the counted
