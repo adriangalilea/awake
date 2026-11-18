@@ -137,11 +137,12 @@ pnpm --dir "$garden/tools/release" exec tsx film.ts awake "$PWD"/dist/films/${FI
 # (actool's is not byte-stable), so every task that bundles or shows the icon
 # depends on this one. `mark preview awake.icon` is the review.
 [tasks.icon]
+tags = ["build-steps"]
 description = "Compile awake.icon: Resources/Assets.car + awake.icns + icon.png (swift-utils' mark)"
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 sources = ["awake.icon/icon.json", "awake.icon/Assets/*.svg"]
 outputs = ["Resources/Assets.car", "Resources/awake.icns", "Resources/icon.png"]
-run = "mark build awake.icon --out Resources --png Resources/icon.png"
+run = "build run --step awake-icon --writes Resources -- mark build awake.icon --out Resources --png Resources/icon.png"
 
 [tasks.glyphlab]
 description = "Menu-bar preview of candidate icon states (click a variant to cycle) — scripts/glyphlab.swift"
@@ -158,6 +159,7 @@ depends = ["icon"]
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
 mise run build
+build run --step awake-install --writes "$APP" --writes "$DEV_APP" --writes .build --writes Resources -- /bin/bash -eu <<'RESERVED'
 prefix="${PREFIX:-$HOME/.local}"
 mkdir -p "$prefix/bin"
 test -x "$APPBIN" && "$APPBIN" agent uninstall || true
@@ -193,15 +195,18 @@ done
 echo "installed $DEV_APP (+ awake, asleep symlinks, the agent skill)"
 # The binary owns the agent, not this file.
 "$DEV_APPBIN" agent install
+RESERVED
 '''
 
 # Back to the release (what `mise run release` built into $DIST, of exactly
 # these commits): awake Dev's agent stopped, the release installed with its
 # agent, `awake`/`asleep` pointing into it.
 [tasks."install:release"]
+tags = ["build-steps"]
 description = "Install the release from dist/ with its agent; stops awake Dev's agent"
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
+build run --step awake-install-release --writes "$APP" --writes "$DEV_APP" --writes "$DIST" -- /bin/bash -eu <<'RESERVED'
 ship released
 # The release leaves the app zipped, never a runnable copy at rest beside the
 # installed one; it is unpacked out of sight and moved into place.
@@ -221,11 +226,14 @@ ln -sf "$APPBIN" "$prefix/bin/awake"
 ln -sf "$APPBIN" "$prefix/bin/asleep"
 echo "installed $APP (+ awake, asleep symlinks)"
 "$APPBIN" agent install
+RESERVED
 '''
 
 [tasks.uninstall]
+tags = ["build-steps"]
 description = "Remove both apps (release and awake Dev), their agents and the symlinks (sudoers grant: awake grant --remove)"
 run = '''
+build run --step awake-uninstall --writes "$APP" --writes "$DEV_APP" -- /bin/bash -eu <<'RESERVED'
 prefix="${PREFIX:-$HOME/.local}"
 # Unregister while the bundle exists: SMAppService resolves the agent through it.
 test -x "$APPBIN" && "$APPBIN" agent uninstall || true
@@ -233,11 +241,12 @@ test -x "$DEV_APPBIN" && "$DEV_APPBIN" agent uninstall || true
 rm -rf "$APP" "$DEV_APP"
 rm -f "$prefix/bin/awake" "$prefix/bin/asleep"
 echo "removed both apps, symlinks, launchd agents. Sudoers grant: sudo rm /etc/sudoers.d/awake"
+RESERVED
 '''
 
 [tasks.clean]
 tags = ["build-steps"]
-run = 'build run --step awake-clean --writes .build -- rm -rf .build "$DIST"'
+run = 'build run --step awake-clean --writes .build --writes "$DIST" -- rm -rf .build "$DIST"'
 
 # THE WORDS GATE: a release exists only once a human has written what changed.
 # git-cliff DRAFTS from the commits; the draft is raw material, not prose users
