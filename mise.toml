@@ -11,7 +11,7 @@
 #   ship-check what would stop a release right now, each blocked gate with its real answer
 #   publish    dmg → R2 behind awake.untitled.garden/releases (the COUNTED url) + notes → garden ($GARDEN)
 #   icon       awake.icon (Icon Composer, SVG layers) → Assets.car + awake.icns + icon.png (swift-utils' mark)
-# Every compiling task runs under scripts/locked.sh (the build mutex);
+# Each compiling leaf reserves its SwiftPM scratch directory through build.
 # scripts/assemble.sh builds the .app for install AND release, one implementation.
 
 [env]
@@ -33,8 +33,9 @@ DEV_APPBIN = "{{ env.HOME }}/Applications/awake Dev.app/Contents/MacOS/awake"
 DIST = "dist"
 
 [tasks.build]
+tags = ["build-steps"]
 description = "Build the awake binary (release)"
-run = "scripts/locked.sh swift build -c release"
+run = "build run --step awake-release --writes .build -- swift build -c release"
 
 # The dev loop: the DEBUG daemon in the foreground, the installed awake's
 # agent (whichever `awake` points into) stopped for exactly that long and
@@ -43,9 +44,10 @@ run = "scripts/locked.sh swift build -c release"
 # touches the release's claims. `mise run install` makes the development
 # build the installed one.
 [tasks.dev]
+tags = ["build-steps"]
 description = "Foreground DEBUG daemon (its own state); stops the installed agent, restores it on exit"
 run = '''
-scripts/locked.sh swift build
+build run --step awake-debug --writes .build -- swift build
 active=$(readlink "${PREFIX:-$HOME/.local}/bin/awake")
 "$active" agent uninstall
 trap '"$active" agent install' EXIT
@@ -61,10 +63,11 @@ description = "swift-format lint, advisory (format-clean is the gate, not lint t
 run = "xcrun swift-format lint --recursive Sources/ scripts/"
 
 [tasks.check]
+tags = ["build-steps"]
 description = "format + compile everything, debug — the FAST typecheck (must be 0 warnings); recompiles the scenes, so a menu change that breaks one fails here"
 run = '''
 mise run format
-scripts/locked.sh swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
+build run --step awake-debug --writes .build -- swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
 .build/debug/awake-scene scenes/*.scene > /dev/null || .build/debug/awake-scene scenes/*.scene
 mise run lock-in
 '''
@@ -83,11 +86,12 @@ run = "grant lint Sources"
 # code. The timelines land in this repo (committed, CI checks they are current) and,
 # where UI and GARDEN name those checkouts, in the ui studio and the garden.
 [tasks.scene]
+tags = ["build-steps"]
 description = "Compile scenes/*.scene into web timelines + art.json (here, the ui studio, the garden)"
 # art.json carries the app icon, Resources/icon.png.
 depends = ["icon"]
 run = '''
-scripts/locked.sh swift build --product awake-scene > /dev/null
+build run --step awake-scene-debug --writes .build -- swift build --product awake-scene > /dev/null
 set -- --out scenes
 if [ -n "$UI" ]; then set -- "$@" --out "$UI/public/macos/awake"; fi
 if [ -n "$GARDEN" ]; then set -- "$@" --out "$GARDEN/apps/garden/components/scenes/awake"; fi
@@ -95,6 +99,7 @@ if [ -n "$GARDEN" ]; then set -- "$@" --out "$GARDEN/apps/garden/components/scen
 '''
 
 [tasks."scene:watch"]
+tags = ["build-steps"]
 description = "The studio loop: recompile a scene on every save (open localhost:3100/macos or the garden)"
 run = "WATCH=1 mise run scene"
 
@@ -107,6 +112,7 @@ run = "WATCH=1 mise run scene"
 # five-minute cache), so the README's links survive every re-film. Needs the ui and
 # garden checkouts, named by UI and GARDEN; FILM=<scene> films one.
 [tasks.film]
+tags = ["build-steps"]
 description = "Film the scenes (WebP + mp4) and publish them to cdn.untitled.garden/media/awake/films/"
 depends = ["scene"]
 run = '''
@@ -145,6 +151,7 @@ run = "swift scripts/glyphlab.swift"
 # into it. The release's agent is stopped first (its app and state untouched;
 # its claims wait there until `mise run install:release` swaps back).
 [tasks.install]
+tags = ["build-steps"]
 description = "Build + install awake Dev (Apple Development) with its agent, symlinks and skill; stops the release's agent"
 depends = ["icon"]
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
@@ -228,7 +235,8 @@ echo "removed both apps, symlinks, launchd agents. Sudoers grant: sudo rm /etc/s
 '''
 
 [tasks.clean]
-run = 'rm -rf .build "$DIST"'
+tags = ["build-steps"]
+run = 'build run --step awake-clean --writes .build -- rm -rf .build "$DIST"'
 
 # THE WORDS GATE: a release exists only once a human has written what changed.
 # git-cliff DRAFTS from the commits; the draft is raw material, not prose users
@@ -253,6 +261,7 @@ echo "drafted $notes — REWRITE it for humans, then commit it"
 # the release of exactly these commits, and tags, pushes and runs the
 # channels. CI's job is the 0-warning gate, nothing more.
 [tasks.release]
+tags = ["build-steps"]
 description = "ship release (one approval: the notarized dmg of these commits), then ship publish: tag, GitHub Release, publish, cask"
 depends = ["check", "ship-check"]
 # swift-utils' `ship`, one release for every app. A task tool, not [tools]: CI
@@ -266,6 +275,7 @@ ship publish --name awake --app "$DIST/awake.app" --github --after "mise run pub
 # Inside `ship release` only (scripts/release): its keychain and key are in
 # the environment, and ship build refuses anywhere else.
 [tasks."release:build"]
+tags = ["build-steps"]
 description = "ship build, inside ship release: signed, notarized dmg in $DIST"
 tools = { "spm:adriangalilea/swift-utils" = { version = "0.100.0", filter_bins = "grant,ship,mark,since" } }
 run = '''
