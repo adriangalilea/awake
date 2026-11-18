@@ -66,8 +66,9 @@ run = "xcrun swift-format lint --recursive Sources/ scripts/"
 tags = ["build-steps"]
 description = "format + compile everything, debug — the FAST typecheck (must be 0 warnings); recompiles the scenes, so a menu change that breaks one fails here"
 run = '''
+set -e
 mise run format
-build run --step awake-debug --writes .build -- swift build > /dev/null && echo "awake: 0 errors, 0 warnings"
+build run --step awake-debug --writes .build -- swift build
 .build/debug/awake-scene scenes/*.scene > /dev/null || .build/debug/awake-scene scenes/*.scene
 mise run lock-in
 '''
